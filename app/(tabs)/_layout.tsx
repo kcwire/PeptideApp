@@ -29,6 +29,8 @@ export default function TabLayout() {
       <Tabs.Screen name="vials" options={{ title: 'Vials', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>💉</Text>) }} />
       <Tabs.Screen name="add" options={{ title: 'Add', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>➕</Text>) }} />
       <Tabs.Screen name="inactive" options={{ title: 'Inactive', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>⏸️</Text>) }} />
+      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>⚙️</Text>) }} 
+      />
     </Tabs>
   );
 }

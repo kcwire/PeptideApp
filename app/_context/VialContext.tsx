@@ -120,9 +120,15 @@ export const VialProvider = ({ children }) => {
     setVials(updatedVials);
     saveVials(updatedVials);
   };
+  
+  // NEW: Completely overwrites the database with imported backup data
+  const restoreData = (importedVials) => {
+    setVials(importedVials);
+    saveVials(importedVials);
+  };
 
   return (
-    <VialContext.Provider value={{ vials, addVial, updateVial, startNextVial, toggleArchive, deleteVial, logInjection, deleteLog }}>
+    <VialContext.Provider value={{ vials, addVial, updateVial, startNextVial, toggleArchive, deleteVial, logInjection, deleteLog, restoreData }}>
       {children}
     </VialContext.Provider>
   );
