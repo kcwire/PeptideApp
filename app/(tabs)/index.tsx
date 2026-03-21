@@ -1,98 +1,205 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React, { useContext, useMemo, useState } from 'react';
+import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { VialContext } from '../_context/VialContext';
+import { styles } from '../theme';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function ScheduleScreen() {
+  const { vials, logInjection } = useContext(VialContext);
 
-export default function HomeScreen() {
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [weekOffset, setWeekOffset] = useState(0); 
+
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fullMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const activeWeekDates = useMemo(() => {
+    const dates = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const activeWeekStart = new Date(today);
+    activeWeekStart.setDate(today.getDate() - today.getDay() + (weekOffset * 7));
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(activeWeekStart);
+      d.setDate(activeWeekStart.getDate() + i);
+      dates.push(d);
+    }
+    return dates;
+  }, [weekOffset]);
+
+  const handleJumpToToday = () => {
+    setWeekOffset(0);
+    setSelectedDate(new Date());
+  };
+
+  const currentDayName = days[selectedDate.getDay()];
+  const isWeekday = selectedDate.getDay() >= 1 && selectedDate.getDay() <= 5;
+  const selectedDateString = `${currentDayName}, ${months[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
+
+  const realTodayMidnight = new Date();
+  realTodayMidnight.setHours(0, 0, 0, 0);
+  const selectedMidnight = new Date(selectedDate);
+  selectedMidnight.setHours(0, 0, 0, 0);
+  
+  const isFutureDate = selectedMidnight > realTodayMidnight;
+  const isSelectedToday = selectedMidnight.getTime() === realTodayMidnight.getTime();
+
+  // THE NEW SMART FILTER
+  const scheduledVials = useMemo(() => {
+    return vials.filter(vial => {
+      if (vial.isArchived) return false;
+      
+      // RULE 1: If it was logged today, ALWAYS show it (Catches off-schedule injections!)
+      const hasLogged = vial.logs?.some(log => log.date.split(' - ')[0] === selectedDateString);
+      if (hasLogged) return true;
+
+      // RULE 2: Is it scheduled for today?
+      const freq = vial.frequency || 'Daily';
+      const customDays = vial.selectedDays || (freq === 'Bi-Weekly' ? ['Mon', 'Thu'] : []);
+
+      if (freq === 'Daily') return true;
+      if (freq === 'Mon-Fri' && isWeekday) return true;
+      if ((freq === 'Specific Days' || freq === 'Bi-Weekly') && customDays.includes(currentDayName)) return true;
+      
+      return false;
+    });
+  }, [vials, currentDayName, isWeekday, selectedDateString]);
+
+  const amVials = scheduledVials.filter(v => v.timeOfDay === 'AM');
+  const pmVials = scheduledVials.filter(v => v.timeOfDay === 'PM');
+  const anyVials = scheduledVials.filter(v => !v.timeOfDay || v.timeOfDay === 'Any');
+
+  const handleQuickLog = (vial) => {
+    const rawDoseAmount = vial.doseAmount || vial.doseMcg;
+    const unit = vial.doseUnit || 'mcg';
+    const dateToLog = isSelectedToday ? null : selectedDate.toISOString();
+    
+    Alert.alert("Log Injection", `Log ${rawDoseAmount}${unit} of ${vial.vialName || vial.name} for ${selectedDateString}?`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Log It", onPress: () => logInjection(vial.id, rawDoseAmount, unit, vial.doseMcg, dateToLog) }
+    ]);
+  };
+
+  const renderVialRow = (vial, borderStyle) => {
+    const activePeptides = vial.peptides && vial.peptides.length > 0 ? vial.peptides : [{ name: vial.name, mg: vial.vialMg }];
+    const primaryPeptide = activePeptides[0];
+    const rawDoseAmount = vial.doseAmount || vial.doseMcg;
+    const unit = vial.doseUnit || 'mcg';
+    
+    const concentrationMgPerMl = primaryPeptide.mg / vial.bacWaterMl;
+    const volumeMl = (vial.doseMcg / 1000) / concentrationMgPerMl;
+    const units = (volumeMl * 100).toFixed(1);
+
+    const hasLoggedOnSelectedDate = vial.logs?.some(log => log.date.split(' - ')[0] === selectedDateString);
+
+    return (
+      <View key={vial.id} style={[styles.dashCard, borderStyle, hasLoggedOnSelectedDate && styles.dashCardDone]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.dashVialName, hasLoggedOnSelectedDate && styles.dashTextDone]}>{vial.vialName || vial.name}</Text>
+          <Text style={[styles.dashDose, hasLoggedOnSelectedDate && styles.dashTextDone]}>{rawDoseAmount}{unit} ({primaryPeptide.name})</Text>
+          <Text style={[styles.dashUnits, hasLoggedOnSelectedDate && styles.dashTextDone]}>Pull: {units} Units</Text>
+        </View>
+        
+        {hasLoggedOnSelectedDate ? (
+          <View style={styles.dashLogBtnDone}><Text style={styles.dashLogTextDone}>✓ Done</Text></View>
+        ) : isFutureDate ? (
+          <View style={styles.dashUpcomingBadge}><Text style={styles.dashUpcomingText}>Upcoming</Text></View>
+        ) : (
+          <TouchableOpacity style={styles.dashLogBtn} onPress={() => handleQuickLog(vial)}>
+            <Text style={styles.dashLogText}>✓ Log</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  const getIndicatorDots = (calendarDate) => {
+    const dateStr = `${days[calendarDate.getDay()]}, ${months[calendarDate.getMonth()]} ${calendarDate.getDate()}`;
+    const isWkdy = calendarDate.getDay() >= 1 && calendarDate.getDay() <= 5;
+    const dayName = days[calendarDate.getDay()];
+    
+    const dateMidnight = new Date(calendarDate);
+    dateMidnight.setHours(0, 0, 0, 0);
+    const isPast = dateMidnight < realTodayMidnight;
+
+    let scheduledCount = 0;
+    let loggedCount = 0;
+
+    vials.forEach(vial => {
+      if (vial.isArchived) return;
+      
+      const hasLogged = vial.logs?.some(log => log.date.split(' - ')[0] === dateStr);
+      if (hasLogged) loggedCount++;
+
+      const freq = vial.frequency || 'Daily';
+      const customDays = vial.selectedDays || (freq === 'Bi-Weekly' ? ['Mon', 'Thu'] : []);
+      
+      let isScheduled = false;
+      if (freq === 'Daily') isScheduled = true;
+      if (freq === 'Mon-Fri' && isWkdy) isScheduled = true;
+      if ((freq === 'Specific Days' || freq === 'Bi-Weekly') && customDays.includes(dayName)) isScheduled = true;
+      
+      // If it's scheduled OR it was logged as an "extra" off-schedule dose, we count it as a required dot slot
+      if (isScheduled || hasLogged) scheduledCount++;
+    });
+
+    const dots = [];
+    for (let i = 0; i < loggedCount; i++) dots.push(<View key={`g${i}`} style={[styles.dot, styles.dotGreen]} />);
+    
+    const remaining = Math.max(0, scheduledCount - loggedCount);
+    for (let i = 0; i < remaining; i++) {
+      if (isPast) dots.push(<View key={`r${i}`} style={[styles.dot, styles.dotRed]} />);
+      else dots.push(<View key={`gry${i}`} style={[styles.dot, styles.dotGray]} />);
+    }
+
+    return dots;
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.container}>
+      {/* Calendar Header */}
+      <View style={{ backgroundColor: '#fff', paddingTop: 10 }}>
+        <View style={styles.calHeaderRow}>
+          <TouchableOpacity style={styles.calArrowBtn} onPress={() => setWeekOffset(w => w - 1)}><Text style={styles.calArrowText}>{"<"}</Text></TouchableOpacity>
+          <Text style={styles.calMonthText}>{fullMonths[activeWeekDates[0].getMonth()]} {activeWeekDates[0].getFullYear()}</Text>
+          <TouchableOpacity style={styles.calArrowBtn} onPress={() => setWeekOffset(w => w + 1)}><Text style={styles.calArrowText}>{">"}</Text></TouchableOpacity>
+        </View>
+        {(weekOffset !== 0 || !isSelectedToday) && (
+          <View style={{ alignItems: 'center', marginBottom: 10 }}>
+            <TouchableOpacity style={styles.jumpTodayBtn} onPress={handleJumpToToday}><Text style={styles.jumpTodayText}>Jump to Today</Text></TouchableOpacity>
+          </View>
+        )}
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      {/* 7-Day Week Strip */}
+      <View style={styles.weekRow}>
+        {activeWeekDates.map((date, index) => {
+          const isSelected = date.toDateString() === selectedDate.toDateString();
+          const isActualToday = date.toDateString() === new Date().toDateString();
+          return (
+            <TouchableOpacity key={index} style={[styles.dayBlock, isSelected && styles.dayBlockSelected, isActualToday && !isSelected && styles.dayBlockToday]} onPress={() => setSelectedDate(date)}>
+              <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>{days[date.getDay()]}</Text>
+              <Text style={[styles.dateText, isSelected && styles.dateTextSelected]}>{date.getDate()}</Text>
+              <View style={styles.dotRow}>{getIndicatorDots(date)}</View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.dashHeader}>{isSelectedToday ? "Today's Schedule" : selectedDateString}</Text>
+        <Text style={styles.dashSub}>{isFutureDate ? "Upcoming Injections" : isSelectedToday ? "Don't forget to log!" : "Past Injections"}</Text>
+
+        {scheduledVials.length === 0 ? <Text style={styles.emptyText}>No injections scheduled for this date. 🎉</Text> : (
+          <>
+            {amVials.length > 0 && <View style={styles.timeSection}><Text style={styles.timeHeader}>🌅 Morning (AM)</Text>{amVials.map(v => renderVialRow(v, styles.dashCardAM))}</View>}
+            {pmVials.length > 0 && <View style={styles.timeSection}><Text style={styles.timeHeader}>🌙 Evening (PM)</Text>{pmVials.map(v => renderVialRow(v, styles.dashCardPM))}</View>}
+            {anyVials.length > 0 && <View style={styles.timeSection}><Text style={styles.timeHeader}>⏱️ Anytime</Text>{anyVials.map(v => renderVialRow(v, styles.dashCardAny))}</View>}
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
