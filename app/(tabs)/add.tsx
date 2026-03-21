@@ -1,12 +1,15 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import React, { useContext, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VialContext } from '../_context/VialContext';
-import { styles } from '../theme';
+import { getStyles, vialColors } from '../theme';
 
 export default function AddScreen() {
+  const theme = useColorScheme() ?? 'light';
+  const styles = getStyles(theme);
+  const [color, setColor] = useState(vialColors[0]);
   const { addVial } = useContext(VialContext);
   const router = useRouter();
 
@@ -69,6 +72,7 @@ export default function AddScreen() {
       frequency,
       selectedDays,
       unopenedVials: parseInt(unopenedVials) || 0,
+      color,
       timeOfDay: timeOfDay,
       reconstitutedDate: reconstitutedDate || new Date().toISOString().split('T')[0],
       logs: [],
@@ -166,6 +170,17 @@ export default function AddScreen() {
 
             <Text style={styles.label}>Inventory (Unopened Vials)</Text>
             <TextInput style={styles.input} placeholder="e.g. 2" keyboardType="numeric" value={unopenedVials} onChangeText={setUnopenedVials} />
+            
+            <Text style={styles.label}>Vial Color Tag</Text>
+            <View style={styles.colorPickerRow}>
+              {vialColors.map(c => (
+                <TouchableOpacity 
+                  key={c} 
+                  style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} 
+                  onPress={() => setColor(c)}
+                />
+              ))}
+            </View>
 
             <Text style={styles.label}>Date Reconstituted</Text>
             <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={() => setShowDatePicker(true)}>

@@ -1,9 +1,11 @@
 import React, { useContext } from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { VialContext } from '../_context/VialContext';
-import { styles } from '../theme';
+import { getStyles } from '../theme';
 
 export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, onEdit, onLogPast }) {
+  const theme = useColorScheme() ?? 'light';
+  const styles = getStyles(theme);
   const { toggleArchive, deleteVial, logInjection, deleteLog, startNextVial } = useContext(VialContext);
 
   const activePeptides = vial.peptides && vial.peptides.length > 0 ? vial.peptides : [{ name: vial.name, mg: vial.vialMg }];
@@ -47,7 +49,11 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
   };
 
   return (
-    <View style={[styles.vialCard, !isActive && styles.archivedCard]}>
+    <View style={[
+      styles.vialCard, 
+      !isActive && styles.archivedCard, 
+      { borderLeftWidth: 6, borderLeftColor: vial.color || '#3b82f6' }
+    ]}>
       
       {/* Header */}
       <View style={styles.vialHeader}>

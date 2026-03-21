@@ -1,10 +1,13 @@
 import React, { useContext, useMemo, useState } from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VialContext } from '../_context/VialContext';
-import { styles } from '../theme';
+import { getStyles } from '../theme';
 
 export default function ScheduleScreen() {
+  const theme = useColorScheme() ?? 'light';
+  const styles = getStyles(theme);
+
   const { vials, logInjection } = useContext(VialContext);
 
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -95,7 +98,11 @@ export default function ScheduleScreen() {
     const hasLoggedOnSelectedDate = vial.logs?.some(log => log.date.split(' - ')[0] === selectedDateString);
 
     return (
-      <View key={vial.id} style={[styles.dashCard, borderStyle, hasLoggedOnSelectedDate && styles.dashCardDone]}>
+      <View key={vial.id} style={[
+        styles.dashCard, 
+        { borderLeftColor: hasLoggedOnSelectedDate ? styles.dashCardDone.borderLeftColor : (vial.color || '#3b82f6') },
+        hasLoggedOnSelectedDate && styles.dashCardDone
+      ]}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.dashVialName, hasLoggedOnSelectedDate && styles.dashTextDone]}>{vial.vialName || vial.name}</Text>
           <Text style={[styles.dashDose, hasLoggedOnSelectedDate && styles.dashTextDone]}>{rawDoseAmount}{unit} ({primaryPeptide.name})</Text>
@@ -160,7 +167,7 @@ export default function ScheduleScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Calendar Header */}
-      <View style={{ backgroundColor: '#fff', paddingTop: 10 }}>
+      <View style={{ paddingTop: 10 }}>
         <View style={styles.calHeaderRow}>
           <TouchableOpacity style={styles.calArrowBtn} onPress={() => setWeekOffset(w => w - 1)}><Text style={styles.calArrowText}>{"<"}</Text></TouchableOpacity>
           <Text style={styles.calMonthText}>{fullMonths[activeWeekDates[0].getMonth()]} {activeWeekDates[0].getFullYear()}</Text>

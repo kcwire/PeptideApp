@@ -46,9 +46,9 @@ export const VialProvider = ({ children }) => {
   };
 
   const addVial = (newVial) => {
-    // Inject default inventory tracking if not provided
     const vialWithInventory = {
       ...newVial,
+      color: newVial.color || '#3b82f6', // Default to blue if none provided
       unopenedVials: newVial.unopenedVials || 0,
       completedVials: 0
     };
@@ -57,11 +57,12 @@ export const VialProvider = ({ children }) => {
     saveVials(updatedVials);
   };
 
-  const updateVial = (id, doseAmount, doseUnit, frequency, timeOfDay, selectedDays, unopenedVials) => {
+  // ADDED color to the end of the arguments!
+  const updateVial = (id, doseAmount, doseUnit, frequency, timeOfDay, selectedDays, unopenedVials, color) => {
     const doseMcg = doseUnit === 'mg' ? parseFloat(doseAmount) * 1000 : parseFloat(doseAmount);
     const updatedVials = vials.map(v => 
       v.id === id ? { 
-        ...v, doseAmount: parseFloat(doseAmount), doseUnit, doseMcg, frequency, timeOfDay, selectedDays,
+        ...v, doseAmount: parseFloat(doseAmount), doseUnit, doseMcg, frequency, timeOfDay, selectedDays, color,
         unopenedVials: unopenedVials !== undefined ? parseInt(unopenedVials) || 0 : v.unopenedVials
       } : v
     );

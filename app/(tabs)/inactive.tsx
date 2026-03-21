@@ -1,11 +1,13 @@
 import React, { useContext, useState } from 'react';
-import { ScrollView, Text } from 'react-native';
+import { ScrollView, Text, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VialContext } from '../_context/VialContext';
 import VialCard from '../components/VialCard';
-import { styles } from '../theme';
+import { getStyles } from '../theme';
 
 export default function ArchiveScreen() {
+  const theme = useColorScheme() ?? 'light';
+  const styles = getStyles(theme);
   const { vials } = useContext(VialContext);
   const [expandedLogs, setExpandedLogs] = useState({});
 

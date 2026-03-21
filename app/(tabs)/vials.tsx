@@ -1,12 +1,16 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useContext, useState } from 'react';
-import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VialContext } from '../_context/VialContext';
 import VialCard from '../components/VialCard';
-import { styles } from '../theme';
+import { getStyles, vialColors } from '../theme';
 
 export default function VialsScreen() {
+  const theme = useColorScheme() ?? 'light';
+  const styles = getStyles(theme);
+  const [editColor, setEditColor] = useState(vialColors[0]);
+
   const { vials, updateVial, logInjection } = useContext(VialContext);
   
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -45,6 +49,7 @@ export default function VialsScreen() {
     setSelectedDays(vial.selectedDays || (vial.frequency === 'Bi-Weekly' ? ['Mon', 'Thu'] : []));
     setEditTime(vial.timeOfDay || 'Any'); // Loads the current time setting!
     setEditInventory((vial.unopenedVials || 0).toString());
+    setEditColor(vial.color || vialColors[0]);
     setEditModalVisible(true);
   };
 
@@ -154,13 +159,24 @@ export default function VialsScreen() {
                 ))}
               </View>
 
+              <Text style={styles.label}>Vial Color Tag</Text>
+            <View style={styles.colorPickerRow}>
+              {vialColors.map(c => (
+                <TouchableOpacity 
+                  key={c} 
+                  style={[styles.colorSwatch, { backgroundColor: c }, editColor === c && styles.colorSwatchSelected]} 
+                  onPress={() => setEditColor(c)}
+                />
+              ))}
+            </View>
+
               <View style={styles.modalActionRow}>
                 <TouchableOpacity style={styles.modalCancel} onPress={() => setEditModalVisible(false)}>
                   <Text style={{color: '#6b7280', fontWeight:'bold'}}>Cancel</Text>
                 </TouchableOpacity>
                 {/* NEW: Passed editTime into the update function */}
                 <TouchableOpacity style={styles.modalSave} onPress={() => { 
-                  updateVial(activeVial.id, editDose, editUnit, editFreq, editTime, selectedDays, editInventory); 
+                  updateVial(activeVial.id, editDose, editUnit, editFreq, editTime, selectedDays, editInventory, editColor); 
                   setEditModalVisible(false); 
                 }}>
                   <Text style={{color:'#fff', fontWeight:'bold'}}>Save</Text>
