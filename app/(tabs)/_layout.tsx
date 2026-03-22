@@ -25,8 +25,8 @@ export default function TabLayout() {
         tabBarLabelStyle: { fontSize: 13, fontWeight: 'bold' }
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>📅</Text>) }} />
-      <Tabs.Screen name="vials" options={{ title: 'Vials', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>💉</Text>) }} />
+      <Tabs.Screen name="index" options={{ title: 'Dashboard', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>📅</Text>) }} />
+      <Tabs.Screen name="vials" options={{ title: 'Protocols', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>💉</Text>) }} />
       <Tabs.Screen name="add" options={{ title: 'Add', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>➕</Text>) }} />
       <Tabs.Screen name="inactive" options={{ title: 'Inactive', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>⏸️</Text>) }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ focused }) => (<Text style={{ fontSize: focused ? 24 : 20, opacity: focused ? 1 : 0.5 }}>⚙️</Text>) }} 
