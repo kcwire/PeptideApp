@@ -27,8 +27,11 @@ export default function VialsScreen() {
   
   // Date Picker State for Logs
   const [pastDateInput, setPastDateInput] = useState('');
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
   const [pastDateObj, setPastDateObj] = useState(new Date());
   const [showPastDatePicker, setShowPastDatePicker] = useState(false);
+  const [pastDoseAmount, setPastDoseAmount] = useState('');
+  const [pastDoseUnit, setPastDoseUnit] = useState('mcg');
 
   const [editStartDate, setEditStartDate] = useState('');
   
@@ -58,9 +61,9 @@ export default function VialsScreen() {
 
   const openLogPastModal = (vial) => {
     setActiveVial(vial);
-    const today = new Date();
-    setPastDateObj(today);
-    setPastDateInput(today.toISOString().split('T')[0]);
+    setPastDateInput(new Date().toISOString().split('T')[0]); 
+    setPastDoseAmount((vial.doseAmount || vial.doseMcg).toString());
+    setPastDoseUnit(vial.doseUnit || 'mcg');
     setLogModalVisible(true);
   };
 
@@ -116,14 +119,32 @@ export default function VialsScreen() {
                 </View>
               </View>              
 
-              <Text style={styles.label}>Protocol Start Date (YYYY-MM-DD)</Text>
-                <TextInput 
-                  style={styles.input} 
-                  value={editStartDate} 
-                  onChangeText={setEditStartDate} 
-                  placeholder="e.g. 2026-03-21"
-                  maxLength={10}
-              />
+              <Text style={styles.label}>Protocol Start Date</Text>
+              <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowEditDatePicker(true)} >
+                <Text style={styles.datePickerText}>{editStartDate}</Text>
+              </TouchableOpacity>
+
+              {showEditDatePicker && (
+                <DateTimePicker
+                  // Safely parses the YYYY-MM-DD string back into a Date object
+                  value={new Date(
+                    parseInt(editStartDate.split('-')[0]), 
+                    parseInt(editStartDate.split('-')[1]) - 1, 
+                    parseInt(editStartDate.split('-')[2])
+                  )}
+                  mode="date"
+                  display="default"
+                  onChange={(event, selectedDate) => {
+                    setShowEditDatePicker(false);
+                    if (selectedDate) {
+                      const year = selectedDate.getFullYear();
+                      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                      const day = String(selectedDate.getDate()).padStart(2, '0');
+                      setEditStartDate(`${year}-${month}-${day}`);
+                    }
+                  }}
+                />
+              )}
 
               {/* NEW: Inventory Input */}
               <Text style={styles.label}>Inventory (Unopened Vials)</Text>
@@ -205,27 +226,68 @@ export default function VialsScreen() {
             <View style={styles.modalContent}>
               <Text style={styles.sectionTitle}>Log Past Injection</Text>
               
+              {/* DATE SELECTOR */}
               <Text style={styles.label}>Select Date</Text>
-              <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={() => setShowPastDatePicker(true)}>
-                <Text style={{ color: '#1f2937', fontSize: 15 }}>{pastDateInput}</Text>
+              <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowPastDatePicker(true)}>
+                <Text style={styles.datePickerText}>{pastDateInput}</Text>
               </TouchableOpacity>
 
               {showPastDatePicker && (
                 <DateTimePicker
-                  value={pastDateObj}
+                  value={pastDateObj || new Date()}
                   mode="date"
                   display="default"
                   onChange={handlePastDateChange}
                 />
               )}
 
+              {/* DOSE OVERRIDE INPUTS */}
+              <Text style={styles.label}>Dose Administered</Text>
+              <View style={styles.doseInputRow}>
+                <TextInput 
+                  style={styles.doseAmountInput} 
+                  value={pastDoseAmount} 
+                  onChangeText={setPastDoseAmount} 
+                  keyboardType="numeric" 
+                  placeholder="e.g. 2.5"
+                />
+                <View style={styles.unitToggleContainer}>
+                  <TouchableOpacity 
+                    style={[styles.unitToggleBtn, pastDoseUnit === 'mcg' && styles.unitToggleBtnActive]}
+                    onPress={() => setPastDoseUnit('mcg')}
+                  >
+                    <Text style={[styles.unitButtonText, pastDoseUnit === 'mcg' && styles.unitButtonTextActive]}>mcg</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.unitToggleBtn, pastDoseUnit === 'mg' && styles.unitToggleBtnActive]}
+                    onPress={() => setPastDoseUnit('mg')}
+                  >
+                    <Text style={[styles.unitButtonText, pastDoseUnit === 'mg' && styles.unitButtonActive]}>mg</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* SAVE / CANCEL */}
               <View style={styles.modalActionRow}>
-                <TouchableOpacity style={styles.modalCancel} onPress={() => setLogModalVisible(false)}><Text style={{color: '#6b7280', fontWeight:'bold'}}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.modalCancel} onPress={() => setLogModalVisible(false)}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
                 <TouchableOpacity style={styles.modalSave} onPress={() => { 
-                  logInjection(activeVial.id, activeVial.doseAmount || activeVial.doseMcg, activeVial.doseUnit || 'mcg', activeVial.doseMcg, pastDateInput); 
+                  const numericAmount = parseFloat(pastDoseAmount) || 0;
+                  const calculatedMcg = pastDoseUnit === 'mg' ? numericAmount * 1000 : numericAmount;
+                  
+                  logInjection(
+                    activeVial.id, 
+                    numericAmount, 
+                    pastDoseUnit, 
+                    calculatedMcg, 
+                    pastDateInput
+                  ); 
+                  
                   setLogModalVisible(false); 
                 }}>
-                  <Text style={{color:'#fff', fontWeight:'bold'}}>Save Log</Text>
+                  <Text style={styles.saveText}>Save Log</Text>
                 </TouchableOpacity>
               </View>
             </View>

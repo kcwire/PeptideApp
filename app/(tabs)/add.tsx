@@ -119,19 +119,16 @@ export default function AddScreen() {
             <TextInput style={styles.input} placeholder="2" keyboardType="numeric" value={bacWaterMl} onChangeText={setBacWaterMl} />
 
             <Text style={styles.label}>Target Dose for {peptides[0].name || 'Primary Peptide'}</Text>
-            <View style={styles.row}>
-              <View style={{ width: '60%' }}>
-                <TextInput style={styles.input} placeholder="Amount" keyboardType="numeric" value={doseAmount} onChangeText={setDoseAmount} />
-              </View>
-              <View style={{ width: '35%' }}>
-                <View style={[styles.unitToggleRow, { marginTop: 0, marginBottom: 0 }]}>
-                  <TouchableOpacity style={[styles.unitButton, doseUnit === 'mcg' && styles.unitButtonActive]} onPress={() => setDoseUnit('mcg')}>
-                    <Text style={[styles.unitButtonText, doseUnit === 'mcg' && styles.unitButtonTextActive]}>mcg</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.unitButton, doseUnit === 'mg' && styles.unitButtonActive]} onPress={() => setDoseUnit('mg')}>
-                    <Text style={[styles.unitButtonText, doseUnit === 'mg' && styles.unitButtonTextActive]}>mg</Text>
-                  </TouchableOpacity>
-                </View>
+            <View style={styles.doseInputRow}>
+              <TextInput style={styles.doseAmountInput} placeholder="e.g. 2.5" keyboardType="numeric" value={doseAmount} onChangeText={setDoseAmount} />
+              <View style={styles.unitToggleContainer}>
+                <TouchableOpacity style={[styles.unitToggleBtn, doseUnit === 'mcg' && styles.unitToggleBtnActive]} onPress={() => setDoseUnit('mcg')}>
+                  <Text style={[styles.unitButtonText, doseUnit === 'mcg' && styles.unitButtonTextActive]}>mcg</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.unitToggleBtn, doseUnit === 'mg' && styles.unitToggleBtnActive]} onPress={() => setDoseUnit('mg')}>
+                  <Text style={[styles.unitButtonText, doseUnit === 'mg' && styles.unitButtonTextActive]}>mg</Text>
+                </TouchableOpacity>
+
               </View>
             </View>
 

@@ -20,18 +20,34 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
   const primaryConcMgPerMl = primaryPeptide.mg / vial.bacWaterMl;
   const currentDoseMg = vial.doseMcg / 1000;
   const volumeMl = currentDoseMg / primaryConcMgPerMl;
-  
-  const totalPrimaryMgUsed = vial.logs.reduce((sum, log) => sum + (log.doseMcg / 1000), 0);
-  const primaryMgRemaining = Math.max(0, primaryPeptide.mg - totalPrimaryMgUsed);
-  const remainingDosesCurrent = Math.floor(primaryMgRemaining / currentDoseMg);
 
+  const activeReconDate = vial.reconstitutedDate || vial.startDate;
+  const [rYear, rMonth, rDay] = activeReconDate.split('-');
+  // Set to midnight of the recon date to catch any logs from that day
+  const reconTimestamp = new Date(parseInt(rYear), parseInt(rMonth) - 1, parseInt(rDay)).getTime();
+  // Filter the history: ONLY look at logs taken on or after the Recon date
+  const logsThisVial = vial.logs.filter(log => {
+    // Fallback to the ID for any old test data that missed the timestamp update
+    const logTime = log.timestamp || parseInt(log.id); 
+    return logTime >= reconTimestamp;
+  });
+
+  const totalMcgInVial = (vial.peptides[0]?.mg || 0) * 1000; 
+  const mcgUsedThisVial = logsThisVial.reduce((sum, log) => sum + (log.doseMcg || 0), 0);
+  const remainingDosesCurrent = Math.floor((totalMcgInVial - mcgUsedThisVial) / vial.doseMcg);
+  
   // CYCLE MATH (Current Vial + Inventory)
   const inventoryCount = vial.unopenedVials || 0;
   const completedCount = vial.completedVials || 0;
-  const totalCycleMgLeft = primaryMgRemaining + (inventoryCount * primaryPeptide.mg);
+  const totalCycleMgLeft = (totalMcgInVial / 1000) + (inventoryCount * primaryPeptide.mg);
   const totalCycleDosesLeft = Math.floor(totalCycleMgLeft / currentDoseMg);
 
-  const logsToShow = isExpanded ? vial.logs.slice(0, 5) : vial.logs.slice(0, 1);
+  const sortedLogs = [...vial.logs].sort((a, b) => {
+    const timeA = a.timestamp || parseInt(a.id);
+    const timeB = b.timestamp || parseInt(b.id);
+    return timeB - timeA;
+  });
+  const logsToShow = isExpanded ? sortedLogs : sortedLogs.slice(0, 1);
 
   const handleStartNext = () => {
     Alert.alert(
@@ -60,6 +76,7 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
         <View style={{ flex: 1, paddingRight: 10 }}>
           <Text style={styles.vialName}>{vialTitle}</Text>
           <Text style={styles.vialSub}>{activePeptides.map(p => `${p.name} (${p.mg}mg)`).join(' + ')}</Text>
+          <Text style={styles.reconstitutedText}>Started: {vial.startDate}</Text>
           <Text style={styles.reconstitutedText}>Recon: {vial.reconstitutedDate}</Text>
         </View>
         <TouchableOpacity onPress={() => onEdit(vial)}>
@@ -125,8 +142,7 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
         <View style={styles.logContainer}>
           <Text style={styles.logHeader}>History:</Text>
           {logsToShow.map(log => {
-            const cleanDate = log.date.split(' - ')[0];
-            return (
+              let cleanDate = typeof log.date === 'string' ? log.date.split(' - ')[0] : 'Invalid Date';            return (
               <View key={log.id} style={styles.logEntryRow}>
                 <View style={styles.logTextContainer}>
                   <View style={styles.doseBadge}><Text style={styles.doseBadgeText}>{log.doseAmount || log.doseMcg}{log.doseUnit || 'mcg'}</Text></View>

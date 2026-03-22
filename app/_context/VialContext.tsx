@@ -78,18 +78,30 @@ export const VialProvider = ({ children }) => {
   };
 
   const startNextVial = (id) => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    
-    const updatedVials = vials.map(v => 
-      v.id === id ? { 
-        ...v, 
-        // NEW: When you crack open a new bottle, reset its recon date to today!
-        dateReconstituted: todayStr, 
-        unopenedVials: Math.max(0, (v.unopenedVials || 0) - 1),
-        completedVials: (v.completedVials || 0) + 1
-      } : v
-    );
-    
+    // 1. Get a timezone-safe YYYY-MM-DD string for "today"
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    // 2. Update the specific vial's lifecycle data
+    const updatedVials = vials.map(vial => {
+      if (vial.id === id) {
+        return {
+          ...vial,
+          // Decrement inventory (safeguard against going below 0)
+          unopenedVials: Math.max(0, vial.unopenedVials - 1),
+          // Increment completed graveyard
+          completedVials: (vial.completedVials || 0) + 1,
+          // Reset the physical bottle's mix date to right now
+          reconstitutedDate: todayStr 
+          // Notice we DO NOT touch `startDate` or `logs` so your protocol history is preserved!
+        };
+      }
+      return vial;
+    });
+
     setVials(updatedVials);
     saveVials(updatedVials);
   };
@@ -114,8 +126,18 @@ export const VialProvider = ({ children }) => {
   };
 
   const logInjection = (id, doseAmount, doseUnit, doseMcg, customDate = null) => {
-    const logDate = formatDateTime(customDate);
-    const newLog = { id: Date.now().toString(), date: logDate, doseAmount, doseUnit, doseMcg };
+    let targetDateObj = new Date();
+    if (customDate) {
+      // Splits "2026-03-21" into raw numbers: [2026, 03, 21]
+      const [year, month, day] = customDate.split('-');
+      // Builds a perfect local date. (JS months are 0-indexed, so we subtract 1)
+      targetDateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    
+    // Pass the pristine Date object to your formatter
+    const logDate = formatDateTime(targetDateObj);
+    const sortableTimestamp = targetDateObj.getTime();
+    const newLog = { id: Date.now().toString(), date: logDate, timestamp: sortableTimestamp, doseAmount, doseUnit, doseMcg };
     const updatedVials = vials.map(v => v.id === id ? { ...v, logs: [newLog, ...v.logs] } : v);
     setVials(updatedVials);
     saveVials(updatedVials);

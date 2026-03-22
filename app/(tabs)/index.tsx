@@ -66,7 +66,7 @@ export default function ScheduleScreen() {
       }
       
       // RULE 1: If it was logged today, ALWAYS show it (Catches off-schedule injections!)
-      const hasLogged = vial.logs?.some(log => log.date.split(' - ')[0] === selectedDateString);
+      const hasLogged = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
       if (hasLogged) return true;
 
       // RULE 2: Is it scheduled for today?
@@ -106,7 +106,7 @@ export default function ScheduleScreen() {
     const volumeMl = (vial.doseMcg / 1000) / concentrationMgPerMl;
     const units = (volumeMl * 100).toFixed(1);
 
-    const hasLoggedOnSelectedDate = vial.logs?.some(log => log.date.split(' - ')[0] === selectedDateString);
+    const hasLoggedOnSelectedDate = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
 
     return (
       <View key={vial.id} style={[
@@ -160,7 +160,7 @@ export default function ScheduleScreen() {
         return; 
       }
       
-      const hasLogged = vial.logs?.some(log => log.date.split(' - ')[0] === dateStr);
+      const hasLogged = vial.logs?.some(log => typeof log.date ==='string' && log.date.split(' - ')[0] === dateStr);
       if (hasLogged) loggedCount++;
 
       const freq = vial.frequency || 'Daily';
