@@ -53,6 +53,17 @@ export default function ScheduleScreen() {
   const scheduledVials = useMemo(() => {
     return vials.filter(vial => {
       if (vial.isArchived) return false;
+
+      // NEW: The Ghost Buster
+      // Format the currently selected calendar date
+      const selectedDateStr = selectedDate.toISOString().split('T')[0];
+      // Fallback to recon date just in case it's an old vial from before this update
+      const protocolStart = vial.startDate || vial.dateReconstituted; 
+    
+      // If the calendar is looking at a date BEFORE the protocol even started, hide it!
+      if (selectedDateStr < protocolStart) {
+        return false; 
+      }
       
       // RULE 1: If it was logged today, ALWAYS show it (Catches off-schedule injections!)
       const hasLogged = vial.logs?.some(log => log.date.split(' - ')[0] === selectedDateString);
@@ -127,6 +138,11 @@ export default function ScheduleScreen() {
     const isWkdy = calendarDate.getDay() >= 1 && calendarDate.getDay() <= 5;
     const dayName = days[calendarDate.getDay()];
     
+    const year = calendarDate.getFullYear();
+    const month = String(calendarDate.getMonth() + 1).padStart(2, '0');
+    const day = String(calendarDate.getDate()).padStart(2, '0');
+    const localCompareStr = `${year}-${month}-${day}`;
+
     const dateMidnight = new Date(calendarDate);
     dateMidnight.setHours(0, 0, 0, 0);
     const isPast = dateMidnight < realTodayMidnight;
@@ -136,6 +152,13 @@ export default function ScheduleScreen() {
 
     vials.forEach(vial => {
       if (vial.isArchived) return;
+
+      const protocolStart = vial.startDate || vial.dateReconstituted;
+      
+      // 3. FIXED: Compare the correct string formats! ("2026-03-15" < "2026-03-21")
+      if (localCompareStr < protocolStart) {
+        return; 
+      }
       
       const hasLogged = vial.logs?.some(log => log.date.split(' - ')[0] === dateStr);
       if (hasLogged) loggedCount++;

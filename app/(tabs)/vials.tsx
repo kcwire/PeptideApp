@@ -29,6 +29,8 @@ export default function VialsScreen() {
   const [pastDateInput, setPastDateInput] = useState('');
   const [pastDateObj, setPastDateObj] = useState(new Date());
   const [showPastDatePicker, setShowPastDatePicker] = useState(false);
+
+  const [editStartDate, setEditStartDate] = useState('');
   
   const [expandedLogs, setExpandedLogs] = useState({});
   const frequencyOptions = ['Daily', 'Mon-Fri', 'Specific Days'];
@@ -50,6 +52,7 @@ export default function VialsScreen() {
     setEditTime(vial.timeOfDay || 'Any'); // Loads the current time setting!
     setEditInventory((vial.unopenedVials || 0).toString());
     setEditColor(vial.color || vialColors[0]);
+    setEditStartDate(vial.startDate || new Date().toISOString().split('T')[0]);
     setEditModalVisible(true);
   };
 
@@ -111,9 +114,35 @@ export default function VialsScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
-              </View>
+              </View>              
+
+              <Text style={styles.label}>Protocol Start Date (YYYY-MM-DD)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  value={editStartDate} 
+                  onChangeText={setEditStartDate} 
+                  placeholder="e.g. 2026-03-21"
+                  maxLength={10}
+              />
+
+              {/* NEW: Inventory Input */}
+              <Text style={styles.label}>Inventory (Unopened Vials)</Text>
+              <TextInput 
+                style={styles.input} 
+                keyboardType="numeric" 
+                value={editInventory} 
+                onChangeText={setEditInventory} 
+                placeholder="e.g. 2"
+              />
 
               <Text style={styles.label}>Frequency</Text>
+              <View style={styles.unitToggleRow}>
+                {frequencyOptions.map(freq => (
+                  <TouchableOpacity key={freq} style={[styles.unitButton, editFreq === freq && styles.unitButtonActive]} onPress={() => setEditFreq(freq)}>
+                    <Text style={[styles.unitButtonText, editFreq === freq && styles.unitButtonTextActive, {fontSize: 12}]}>{freq}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
               {/* Custom Day Picker */}
               { (editFreq === 'Specific Days' || editFreq === 'Specific Days') && (
                 <View style={styles.dayPickerRow}>
@@ -130,24 +159,6 @@ export default function VialsScreen() {
                   ))}
                 </View>
               )}
-
-              {/* NEW: Inventory Input */}
-              <Text style={styles.label}>Inventory (Unopened Vials)</Text>
-              <TextInput 
-                style={styles.input} 
-                keyboardType="numeric" 
-                value={editInventory} 
-                onChangeText={setEditInventory} 
-                placeholder="e.g. 2"
-              />
-
-              <View style={styles.unitToggleRow}>
-                {frequencyOptions.map(freq => (
-                  <TouchableOpacity key={freq} style={[styles.unitButton, editFreq === freq && styles.unitButtonActive]} onPress={() => setEditFreq(freq)}>
-                    <Text style={[styles.unitButtonText, editFreq === freq && styles.unitButtonTextActive, {fontSize: 12}]}>{freq}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
 
               {/* NEW: Time of Day Toggle */}
               <Text style={styles.label}>Time of Day</Text>
@@ -176,7 +187,7 @@ export default function VialsScreen() {
                 </TouchableOpacity>
                 {/* NEW: Passed editTime into the update function */}
                 <TouchableOpacity style={styles.modalSave} onPress={() => { 
-                  updateVial(activeVial.id, editDose, editUnit, editFreq, editTime, selectedDays, editInventory, editColor); 
+                  updateVial(activeVial.id, editDose, editUnit, editFreq, editTime, selectedDays, editInventory, editColor, editStartDate); 
                   setEditModalVisible(false); 
                 }}>
                   <Text style={{color:'#fff', fontWeight:'bold'}}>Save</Text>

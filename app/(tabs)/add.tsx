@@ -23,6 +23,7 @@ export default function AddScreen() {
   const [frequency, setFrequency] = useState('Daily');
   
   // Date Picker State
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [reconstitutedDate, setReconstitutedDate] = useState('');
   const [dateObj, setDateObj] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -73,6 +74,7 @@ export default function AddScreen() {
       selectedDays,
       unopenedVials: parseInt(unopenedVials) || 0,
       color,
+      startDate,
       timeOfDay: timeOfDay,
       reconstitutedDate: reconstitutedDate || new Date().toISOString().split('T')[0],
       logs: [],
@@ -135,6 +137,13 @@ export default function AddScreen() {
 
             <Text style={styles.label}>Injection Frequency</Text>
             {/* Custom Day Picker */}
+            <View style={styles.unitToggleRow}>
+              {frequencyOptions.map(freq => (
+                <TouchableOpacity key={freq} style={[styles.unitButton, frequency === freq && styles.unitButtonActive]} onPress={() => setFrequency(freq)}>
+                  <Text style={[styles.unitButtonText, frequency === freq && styles.unitButtonTextActive]}>{freq}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             { frequency === 'Specific Days' && (
               <View style={styles.dayPickerRow}>
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
@@ -151,13 +160,7 @@ export default function AddScreen() {
               </View>
             )}
 
-            <View style={styles.unitToggleRow}>
-              {frequencyOptions.map(freq => (
-                <TouchableOpacity key={freq} style={[styles.unitButton, frequency === freq && styles.unitButtonActive]} onPress={() => setFrequency(freq)}>
-                  <Text style={[styles.unitButtonText, frequency === freq && styles.unitButtonTextActive]}>{freq}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            
 
             <Text style={styles.label}>Time of Day</Text>
             <View style={styles.unitToggleRow}>
@@ -181,6 +184,23 @@ export default function AddScreen() {
                 />
               ))}
             </View>
+
+            <Text style={styles.label}>Protocol Start Date</Text>
+            <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={() => setShowDatePicker(true)}>
+              <Text style={{ color: startDate ? '#1f2937' : '#9ca3af', fontSize: 15 }}>
+                {startDate || 'Select Date (Defaults to Today)'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Native Date Picker */}
+            {showDatePicker && (
+              <DateTimePicker
+                value={dateObj}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
 
             <Text style={styles.label}>Date Reconstituted</Text>
             <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={() => setShowDatePicker(true)}>

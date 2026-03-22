@@ -46,23 +46,30 @@ export const VialProvider = ({ children }) => {
   };
 
   const addVial = (newVial) => {
+    // Grab today's date in YYYY-MM-DD format
+    const todayStr = new Date().toISOString().split('T')[0]; 
+    
     const vialWithInventory = {
       ...newVial,
-      color: newVial.color || '#3b82f6', // Default to blue if none provided
+      startDate: newVial.startDate || todayStr, // Protocol Start Date
+      dateReconstituted: newVial.dateReconstituted || todayStr, // The physical bottle date
+      color: newVial.color || '#3b82f6',
       unopenedVials: newVial.unopenedVials || 0,
       completedVials: 0
     };
+    
     const updatedVials = [vialWithInventory, ...vials];
     setVials(updatedVials);
     saveVials(updatedVials);
   };
 
   // ADDED color to the end of the arguments!
-  const updateVial = (id, doseAmount, doseUnit, frequency, timeOfDay, selectedDays, unopenedVials, color) => {
+  const updateVial = (id, doseAmount, doseUnit, frequency, timeOfDay, selectedDays, unopenedVials, color, startDate) => {
     const doseMcg = doseUnit === 'mg' ? parseFloat(doseAmount) * 1000 : parseFloat(doseAmount);
     const updatedVials = vials.map(v => 
       v.id === id ? { 
         ...v, doseAmount: parseFloat(doseAmount), doseUnit, doseMcg, frequency, timeOfDay, selectedDays, color,
+        startDate: startDate || v.startDate, 
         unopenedVials: unopenedVials !== undefined ? parseInt(unopenedVials) || 0 : v.unopenedVials
       } : v
     );
@@ -70,20 +77,19 @@ export const VialProvider = ({ children }) => {
     saveVials(updatedVials);
   };
 
-  // NEW: Finishes the current vial, pulls one from inventory, and resets the logs
-  const startNextVial = (id, reconDate) => {
-    const updatedVials = vials.map(v => {
-      if (v.id === id) {
-        return {
-          ...v,
-          completedVials: (v.completedVials || 0) + 1,
-          unopenedVials: Math.max(0, (v.unopenedVials || 0) - 1),
-          logs: [], // Clear injection history for the fresh vial
-          reconstitutedDate: reconDate
-        };
-      }
-      return v;
-    });
+  const startNextVial = (id) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    const updatedVials = vials.map(v => 
+      v.id === id ? { 
+        ...v, 
+        // NEW: When you crack open a new bottle, reset its recon date to today!
+        dateReconstituted: todayStr, 
+        unopenedVials: Math.max(0, (v.unopenedVials || 0) - 1),
+        completedVials: (v.completedVials || 0) + 1
+      } : v
+    );
+    
     setVials(updatedVials);
     saveVials(updatedVials);
   };
