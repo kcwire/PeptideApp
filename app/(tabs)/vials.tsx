@@ -1,5 +1,5 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useContext, useState } from 'react';
+import DateInput from '../components/DateInput';
 import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VialContext } from '../_context/VialContext';
@@ -27,9 +27,6 @@ export default function VialsScreen() {
   
   // Date Picker State for Logs
   const [pastDateInput, setPastDateInput] = useState('');
-  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
-  const [pastDateObj, setPastDateObj] = useState(new Date());
-  const [showPastDatePicker, setShowPastDatePicker] = useState(false);
   const [pastDoseAmount, setPastDoseAmount] = useState('');
   const [pastDoseUnit, setPastDoseUnit] = useState('mcg');
 
@@ -67,13 +64,6 @@ export default function VialsScreen() {
     setLogModalVisible(true);
   };
 
-  const handlePastDateChange = (event, selectedDate) => {
-    setShowPastDatePicker(false);
-    if (selectedDate) {
-      setPastDateObj(selectedDate);
-      setPastDateInput(selectedDate.toISOString().split('T')[0]);
-    }
-  };
 
   const activeVialsList = vials.filter(v => !v.isArchived);
 
@@ -119,33 +109,11 @@ export default function VialsScreen() {
                 </View>
               </View>              
 
-              <Text style={styles.label}>Protocol Start Date</Text>
-              <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowEditDatePicker(true)} >
-                <Text style={styles.datePickerText}>{editStartDate}</Text>
-              </TouchableOpacity>
-
-              {showEditDatePicker && (
-                <DateTimePicker
-                  // Safely parses the YYYY-MM-DD string back into a Date object
-                  value={new Date(
-                    parseInt(editStartDate.split('-')[0]), 
-                    parseInt(editStartDate.split('-')[1]) - 1, 
-                    parseInt(editStartDate.split('-')[2])
-                  )}
-                  mode="date"
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    setShowEditDatePicker(false);
-                    if (selectedDate) {
-                      const year = selectedDate.getFullYear();
-                      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-                      const day = String(selectedDate.getDate()).padStart(2, '0');
-                      setEditStartDate(`${year}-${month}-${day}`);
-                    }
-                  }}
-                />
-              )}
-
+              <DateInput 
+                label="Protocol Start Date" 
+                value={editStartDate} 
+                onChange={setEditStartDate} 
+              />
               {/* NEW: Inventory Input */}
               <Text style={styles.label}>Inventory (Unopened Vials)</Text>
               <TextInput 
@@ -227,20 +195,11 @@ export default function VialsScreen() {
               <Text style={styles.sectionTitle}>Log Past Injection</Text>
               
               {/* DATE SELECTOR */}
-              <Text style={styles.label}>Select Date</Text>
-              <TouchableOpacity style={styles.datePickerButton} onPress={() => setShowPastDatePicker(true)}>
-                <Text style={styles.datePickerText}>{pastDateInput}</Text>
-              </TouchableOpacity>
-
-              {showPastDatePicker && (
-                <DateTimePicker
-                  value={pastDateObj || new Date()}
-                  mode="date"
-                  display="default"
-                  onChange={handlePastDateChange}
-                />
-              )}
-
+              <DateInput 
+                label="Select Date" 
+                value={pastDateInput} 
+                onChange={setPastDateInput} 
+              />
               {/* DOSE OVERRIDE INPUTS */}
               <Text style={styles.label}>Dose Administered</Text>
               <View style={styles.doseInputRow}>

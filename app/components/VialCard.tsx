@@ -36,10 +36,10 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
   const mcgUsedThisVial = logsThisVial.reduce((sum, log) => sum + (log.doseMcg || 0), 0);
   const remainingDosesCurrent = Math.floor((totalMcgInVial - mcgUsedThisVial) / vial.doseMcg);
   
-  // CYCLE MATH (Current Vial + Inventory)
+  // CYCLE MATH (Current Remaining Vial + Inventory)
   const inventoryCount = vial.unopenedVials || 0;
   const completedCount = vial.completedVials || 0;
-  const totalCycleMgLeft = (totalMcgInVial / 1000) + (inventoryCount * primaryPeptide.mg);
+  const totalCycleMgLeft = ((totalMcgInVial - mcgUsedThisVial) / 1000) + (inventoryCount * primaryPeptide.mg);
   const totalCycleDosesLeft = Math.floor(totalCycleMgLeft / currentDoseMg);
 
   const sortedLogs = [...vial.logs].sort((a, b) => {

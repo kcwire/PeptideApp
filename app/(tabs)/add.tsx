@@ -1,5 +1,5 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
+import DateInput from '../components/DateInput';
 import React, { useContext, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,9 +25,6 @@ export default function AddScreen() {
   // Date Picker State
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [reconstitutedDate, setReconstitutedDate] = useState('');
-  const [dateObj, setDateObj] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-
   const frequencyOptions = ['Daily', 'Mon-Fri', 'Specific Days'];
 
   const [selectedDays, setSelectedDays] = useState(['Mon', 'Thu']);
@@ -47,13 +44,6 @@ export default function AddScreen() {
   };
   const updatePeptide = (id, field, value) => setPeptides(peptides.map(p => p.id === id ? { ...p, [field]: value } : p));
 
-  const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false); // Hide the picker
-    if (selectedDate) {
-      setDateObj(selectedDate);
-      setReconstitutedDate(selectedDate.toISOString().split('T')[0]); // Format as YYYY-MM-DD
-    }
-  };
 
   const handleAdd = () => {
     const hasEmptyPeptides = peptides.some(p => !p.name || !p.mg);
@@ -182,39 +172,19 @@ export default function AddScreen() {
               ))}
             </View>
 
-            <Text style={styles.label}>Protocol Start Date</Text>
-            <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={() => setShowDatePicker(true)}>
-              <Text style={{ color: startDate ? '#1f2937' : '#9ca3af', fontSize: 15 }}>
-                {startDate || 'Select Date (Defaults to Today)'}
-              </Text>
-            </TouchableOpacity>
+            <DateInput 
+              label="Protocol Start Date" 
+              value={startDate} 
+              onChange={setStartDate} 
+              placeholder="Select Date (Defaults to Today)" 
+            />
 
-            {/* Native Date Picker */}
-            {showDatePicker && (
-              <DateTimePicker
-                value={dateObj}
-                mode="date"
-                display="default"
-                onChange={handleDateChange}
-              />
-            )}
-
-            <Text style={styles.label}>Date Reconstituted</Text>
-            <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={() => setShowDatePicker(true)}>
-              <Text style={{ color: reconstitutedDate ? '#1f2937' : '#9ca3af', fontSize: 15 }}>
-                {reconstitutedDate || 'Select Date (Defaults to Today)'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Native Date Picker */}
-            {showDatePicker && (
-              <DateTimePicker
-                value={dateObj}
-                mode="date"
-                display="default"
-                onChange={handleDateChange}
-              />
-            )}
+            <DateInput 
+              label="Date Reconstituted" 
+              value={reconstitutedDate} 
+              onChange={setReconstitutedDate} 
+              placeholder="Select Date (Defaults to Today)" 
+            />
 
             <TouchableOpacity style={styles.primaryButton} onPress={handleAdd}>
               <Text style={styles.buttonText}>Calculate & Save</Text>
