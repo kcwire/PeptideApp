@@ -64,12 +64,19 @@ export const VialProvider = ({ children }) => {
     
     const inventory = newVial.inventory || [];
     
+    // Process subjects if any
+    const processedSubjects = (newVial.subjects || []).map(s => ({
+      ...s,
+      doseMcg: s.doseUnit === 'mg' ? parseFloat(s.doseAmount) * 1000 : parseFloat(s.doseAmount)
+    }));
+    
     const vialWithInventory = {
       ...newVial,
       startDate: newVial.startDate || todayStr, // Protocol Start Date
       dateReconstituted: newVial.dateReconstituted || todayStr, // The physical bottle date
       color: newVial.color || '#3b82f6',
       inventory: inventory,
+      subjects: processedSubjects.length > 0 ? processedSubjects : undefined,
       completedVials: 0
     };
     
@@ -79,13 +86,20 @@ export const VialProvider = ({ children }) => {
   };
 
   // ADDED color to the end of the arguments!
-  const updateVial = (id, doseAmount, doseUnit, frequency, timeOfDay, selectedDays, inventory, color, startDate) => {
+  const updateVial = (id, doseAmount, doseUnit, frequency, timeOfDay, selectedDays, inventory, color, startDate, subjects) => {
     const doseMcg = doseUnit === 'mg' ? parseFloat(doseAmount) * 1000 : parseFloat(doseAmount);
+    
+    const processedSubjects = (subjects || []).map(s => ({
+      ...s,
+      doseMcg: s.doseUnit === 'mg' ? parseFloat(s.doseAmount) * 1000 : parseFloat(s.doseAmount)
+    }));
+
     const updatedVials = vials.map(v => 
       v.id === id ? { 
         ...v, doseAmount: parseFloat(doseAmount), doseUnit, doseMcg, frequency, timeOfDay, selectedDays, color,
         startDate: startDate || v.startDate, 
-        inventory: inventory || v.inventory || []
+        inventory: inventory || v.inventory || [],
+        subjects: processedSubjects.length > 0 ? processedSubjects : undefined
       } : v
     );
     setVials(updatedVials);
@@ -164,7 +178,7 @@ export const VialProvider = ({ children }) => {
     ]);
   };
 
-  const logInjection = (id, doseAmount, doseUnit, doseMcg, customDate = null) => {
+  const logInjection = (id, doseAmount, doseUnit, doseMcg, customDate = null, subjectId = null, subjectName = null) => {
     let targetDateObj = new Date();
     if (customDate) {
       // Splits "2026-03-21" into raw numbers: [2026, 03, 21]
@@ -176,7 +190,16 @@ export const VialProvider = ({ children }) => {
     // Pass the pristine Date object to your formatter
     const logDate = formatDateTime(targetDateObj);
     const sortableTimestamp = targetDateObj.getTime();
-    const newLog = { id: Date.now().toString(), date: logDate, timestamp: sortableTimestamp, doseAmount, doseUnit, doseMcg };
+    const newLog = { 
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5), 
+      date: logDate, 
+      timestamp: sortableTimestamp, 
+      doseAmount, 
+      doseUnit, 
+      doseMcg,
+      subjectId,
+      subjectName
+    };
     const updatedVials = vials.map(v => v.id === id ? { ...v, logs: [newLog, ...v.logs] } : v);
     setVials(updatedVials);
     saveVials(updatedVials);

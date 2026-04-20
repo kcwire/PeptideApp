@@ -12,14 +12,12 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
   const vialTitle = vial.vialName || vial.name || "Unnamed Vial";
   const primaryPeptide = activePeptides[0];
 
-  const rawDoseAmount = vial.doseAmount || vial.doseMcg;
-  const unit = vial.doseUnit || 'mcg';
-  const displayDose = `${rawDoseAmount} ${unit}`;
-
-  // Current Vial Math
-  const primaryConcMgPerMl = primaryPeptide.mg / vial.bacWaterMl;
-  const currentDoseMg = vial.doseMcg / 1000;
-  const volumeMl = currentDoseMg / primaryConcMgPerMl;
+  const currentDoseMg = vial.subjects && vial.subjects.length > 0
+    ? vial.subjects.reduce((sum, sub) => sum + (sub.doseUnit === 'mg' ? parseFloat(sub.doseAmount) : parseFloat(sub.doseAmount) / 1000), 0)
+    : (vial.doseUnit === 'mg' ? vial.doseAmount : vial.doseAmount / 1000);
+    
+  const concentrationMgPerMl = primaryPeptide.mg / vial.bacWaterMl;
+  const volumeMl = currentDoseMg / concentrationMgPerMl;
 
   const activeReconDate = vial.reconstitutedDate || vial.startDate;
   const [rYear, rMonth, rDay] = activeReconDate.split('-');
@@ -34,14 +32,14 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
 
   const totalMcgInVial = (vial.peptides[0]?.mg || 0) * 1000; 
   const mcgUsedThisVial = logsThisVial.reduce((sum, log) => sum + (log.doseMcg || 0), 0);
-  const remainingDosesCurrent = Math.floor((totalMcgInVial - mcgUsedThisVial) / vial.doseMcg);
+  const remainingDosesCurrent = Math.floor((totalMcgInVial - mcgUsedThisVial) / (vial.doseMcg || 1));
   
   // CYCLE MATH (Current Remaining Vial + Inventory)
   const totalInventoryMg = (vial.inventory || []).reduce((sum, inv) => sum + (inv.mg * inv.count), 0);
   const inventoryCount = (vial.inventory || []).reduce((sum, inv) => sum + inv.count, 0);
   const completedCount = vial.completedVials || 0;
   const totalCycleMgLeft = ((totalMcgInVial - mcgUsedThisVial) / 1000) + totalInventoryMg;
-  const totalCycleDosesLeft = Math.floor(totalCycleMgLeft / currentDoseMg);
+  const totalCycleDosesLeft = Math.floor(totalCycleMgLeft / (currentDoseMg || 1));
 
   const sortedLogs = [...vial.logs].sort((a, b) => {
     const timeA = a.timestamp || parseInt(a.id);
@@ -84,15 +82,14 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
         </View>
         <View style={styles.mixItem}>
           <Text style={styles.mixLabel} numberOfLines={1} adjustsFontSizeToFit>🧪 PRIMARY CONC.</Text>
-          <Text style={styles.mixValue} numberOfLines={1} adjustsFontSizeToFit>{primaryConcMgPerMl.toFixed(2)} mg/ml</Text>
+          <Text style={styles.mixValue} numberOfLines={1} adjustsFontSizeToFit>{concentrationMgPerMl.toFixed(2)} mg/ml</Text>
         </View>
       </View>
 
-      {/* Stats Grid - Now shows Current vs Full Cycle */}
       <View style={styles.statsGrid}>
         <View style={styles.statBox}>
           <Text style={styles.statLabel}>Current Vial</Text>
-          <Text style={[styles.statValue, isActive && remainingDosesCurrent <= 0 && styles.emptyAlert]}>{remainingDosesCurrent}</Text>
+          <Text style={[styles.statValue, isActive && remainingDosesCurrent <= 0 && { color: '#ef4444' }]}>{Math.max(0, remainingDosesCurrent)}</Text>
           <View style={{ width: '100%', alignItems: 'center' }}>
             <Text style={styles.statLabelSub} numberOfLines={1} adjustsFontSizeToFit>Doses left</Text>
           </View>
@@ -109,20 +106,55 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
       {/* Syringe Result */}
       {isActive && (
         <View style={styles.resultBox}>
-          <Text style={styles.resultLabel}>Syringe Measurement:</Text>
-          <Text style={styles.resultValue}>{(volumeMl * 100).toFixed(1)} Units</Text>
-          <View style={{ width: '100%', alignItems: 'center' }}>
-            <Text style={styles.resultSub} numberOfLines={1} adjustsFontSizeToFit>({volumeMl.toFixed(3)} ml)</Text>
-          </View>
+          <Text style={[styles.resultLabel, { marginBottom: 10 }]}>Syringe Measurement:</Text>
+          {vial.subjects && vial.subjects.length > 0 ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 15 }}>
+              {vial.subjects.map((s, idx) => {
+                const sVolumeMl = (s.doseMcg / 1000) / concentrationMgPerMl;
+                return (
+                  <View key={idx} style={{ alignItems: 'center' }}>
+                    <Text style={[styles.resultLabel, { marginBottom: 2, textTransform: 'none', letterSpacing: 0 }]}>{s.name}</Text>
+                    <Text style={styles.resultValue}>{(sVolumeMl * 100).toFixed(1)} Units</Text>
+                    <View style={{ width: '100%', alignItems: 'center' }}>
+                      <Text style={[styles.resultSub, { marginTop: 2 }]} numberOfLines={1} adjustsFontSizeToFit>({s.doseAmount}{s.doseUnit})</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={styles.resultValue}>{(volumeMl * 100).toFixed(1)} Units</Text>
+              <View style={{ width: '100%', alignItems: 'center' }}>
+                <Text style={[styles.resultSub, { marginTop: 2 }]} numberOfLines={1} adjustsFontSizeToFit>({volumeMl.toFixed(3)} ml)</Text>
+              </View>
+            </View>
+          )}
         </View>
       )}
 
       {/* Action Row */}
       {isActive && (
         <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.actionButton, styles.logNowButton]} onPress={() => logInjection(vial.id, rawDoseAmount, unit, vial.doseMcg)}>
-            <Text style={styles.actionButtonText}>✓ Log Now</Text>
-          </TouchableOpacity>
+            {vial.subjects && vial.subjects.length > 0 ? (
+              <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap', flex: 1 }}>
+                {vial.subjects.map(s => (
+                  <TouchableOpacity key={s.id} style={[styles.actionButton, styles.logNowButton, { flex: 1, minWidth: '45%' }]} onPress={() => {
+                    const today = new Date().toISOString().split('T')[0];
+                    logInjection(vial.id, s.doseAmount, s.doseUnit, s.doseMcg, today, s.id, s.name);
+                  }}>
+                    <Text style={styles.actionButtonText}>✓ Log {s.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <TouchableOpacity style={[styles.actionButton, styles.logNowButton]} onPress={() => {
+                const today = new Date().toISOString().split('T')[0];
+                logInjection(vial.id, vial.doseAmount, vial.doseUnit, vial.doseMcg, today);
+              }}>
+                <Text style={styles.actionButtonText}>✓ Log Now</Text>
+              </TouchableOpacity>
+            )}
           <TouchableOpacity style={[styles.actionButton, styles.logPastButton]} onPress={() => onLogPast(vial)}>
             <Text style={styles.actionButtonText}>📅 Log Past</Text>
           </TouchableOpacity>
@@ -137,8 +169,11 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
               let cleanDate = typeof log.date === 'string' ? log.date.split(' - ')[0] : 'Invalid Date';            return (
               <View key={log.id} style={styles.logEntryRow}>
                 <View style={styles.logTextContainer}>
-                  <View style={styles.doseBadge}><Text style={styles.doseBadgeText}>{log.doseAmount || log.doseMcg}{log.doseUnit || 'mcg'}</Text></View>
+                  <View style={styles.doseBadge}><Text style={styles.doseBadgeText}>{log.doseAmount}{log.doseUnit}</Text></View>
                   <Text style={styles.logDate} numberOfLines={1} adjustsFontSizeToFit>{cleanDate}</Text>
+                  {log.subjectName && (
+                    <Text style={{ fontSize: 13, color: '#6b7280', marginLeft: 8, fontStyle: 'italic' }}>({log.subjectName})</Text>
+                  )}
                 </View>
                 <TouchableOpacity onPress={() => deleteLog(vial.id, log.id)} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                   <Text style={styles.deleteLogText}>x</Text>

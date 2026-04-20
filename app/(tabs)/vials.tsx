@@ -22,6 +22,8 @@ export default function VialsScreen() {
   const [editFreq, setEditFreq] = useState('');
   const [editTime, setEditTime] = useState('Any');
   const [editInventory, setEditInventory] = useState([{ id: '1', mg: '', count: '0' }]);
+  const [editIsMultiSubject, setEditIsMultiSubject] = useState(false);
+  const [editSubjects, setEditSubjects] = useState([{ id: '1', name: '', doseAmount: '', doseUnit: 'mcg' }]);
   
   const [nextVialModalVisible, setNextVialModalVisible] = useState(false);
   const [nextVialInventoryIndex, setNextVialInventoryIndex] = useState(-1);
@@ -33,6 +35,7 @@ export default function VialsScreen() {
   
   // Date Picker State for Logs
   const [pastDateInput, setPastDateInput] = useState('');
+  const [pastLogSubjectId, setPastLogSubjectId] = useState('');
   const [pastDoseAmount, setPastDoseAmount] = useState('');
   const [pastDoseUnit, setPastDoseUnit] = useState('mcg');
 
@@ -57,6 +60,14 @@ export default function VialsScreen() {
     setSelectedDays(vial.selectedDays || (vial.frequency === 'Bi-Weekly' ? ['Mon', 'Thu'] : []));
     setEditTime(vial.timeOfDay || 'Any');
     
+    if (vial.subjects && vial.subjects.length > 0) {
+      setEditIsMultiSubject(true);
+      setEditSubjects(vial.subjects.map(s => ({ ...s, doseAmount: s.doseAmount.toString() })));
+    } else {
+      setEditIsMultiSubject(false);
+      setEditSubjects([{ id: '1', name: '', doseAmount: '', doseUnit: 'mcg' }]);
+    }
+    
     if (vial.inventory && vial.inventory.length > 0) {
       setEditInventory(vial.inventory.map((i, idx) => ({ id: idx.toString(), mg: i.mg.toString(), count: i.count.toString() })));
     } else {
@@ -74,6 +85,13 @@ export default function VialsScreen() {
   };
   const updateEditInventory = (id, field, value) => setEditInventory(editInventory.map(i => i.id === id ? { ...i, [field]: value } : i));
 
+  const handleAddEditSubject = () => setEditSubjects([...editSubjects, { id: Date.now().toString(), name: '', doseAmount: '', doseUnit: 'mcg' }]);
+  const handleRemoveEditSubject = (id) => {
+    if (editSubjects.length === 1) return;
+    setEditSubjects(editSubjects.filter(s => s.id !== id));
+  };
+  const updateEditSubject = (id, field, value) => setEditSubjects(editSubjects.map(s => s.id === id ? { ...s, [field]: value } : s));
+
   const openNextVialModal = (vial) => {
     setActiveVial(vial);
     const defaultIndex = vial.inventory ? vial.inventory.findIndex(i => i.count > 0) : -1;
@@ -87,6 +105,7 @@ export default function VialsScreen() {
   const openLogPastModal = (vial) => {
     setActiveVial(vial);
     setPastDateInput(new Date().toISOString().split('T')[0]); 
+    setPastLogSubjectId('');
     setPastDoseAmount((vial.doseAmount || vial.doseMcg).toString());
     setPastDoseUnit(vial.doseUnit || 'mcg');
     setLogModalVisible(true);
@@ -118,38 +137,91 @@ export default function VialsScreen() {
       <Modal visible={editModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           {activeVial && (
-            <View style={styles.modalContent}>
+            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
               <Text style={styles.sectionTitle}>Edit Protocol</Text>
+              <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%' }}>
               
-              <Text style={styles.label}>New Dose for {activeVial.peptides ? activeVial.peptides[0].name : activeVial.name}</Text>
-              <View style={styles.row}>
-                <View style={{ width: '60%' }}>
-                  <TextInput style={styles.input} keyboardType="numeric" value={editDose} onChangeText={setEditDose} placeholder="Amount"/>
-                </View>
-                <View style={{ width: '35%' }}>
-                  <View style={[styles.unitToggleRow, { marginTop: 0, marginBottom: 0 }]}>
-                    <TouchableOpacity style={[styles.unitButton, editUnit === 'mcg' && styles.unitButtonActive]} onPress={() => setEditUnit('mcg')}>
-                      <Text style={[styles.unitButtonText, editUnit === 'mcg' && styles.unitButtonTextActive]}>mcg</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.unitButton, editUnit === 'mg' && styles.unitButtonActive]} onPress={() => setEditUnit('mg')}>
-                      <Text style={[styles.unitButtonText, editUnit === 'mg' && styles.unitButtonTextActive]}>mg</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>              
-
               <DateInput 
                 label="Protocol Start Date" 
                 value={editStartDate} 
                 onChange={setEditStartDate} 
               />
-              {/* NEW: Inventory Input */}
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 10 }}>
+                <Text style={styles.label}>Track for multiple people?</Text>
+                <TouchableOpacity onPress={() => setEditIsMultiSubject(!editIsMultiSubject)}>
+                  <View style={{ width: 50, height: 28, borderRadius: 14, backgroundColor: editIsMultiSubject ? '#3b82f6' : (theme === 'dark' ? '#374151' : '#e5e7eb'), justifyContent: 'center', padding: 2 }}>
+                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff', transform: [{ translateX: editIsMultiSubject ? 22 : 0 }] }} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              {editIsMultiSubject ? (
+                <View style={{ marginBottom: 10 }}>
+                  <Text style={styles.label}>Subjects & Doses</Text>
+                  {editSubjects.map((sub, index) => (
+                    <View key={sub.id} style={{ marginBottom: 10, padding: 10, backgroundColor: theme === 'dark' ? '#1f2937' : '#f9fafb', borderRadius: 8, borderWidth: 1, borderColor: theme === 'dark' ? '#374151' : '#e5e7eb' }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                        <Text style={{ fontWeight: 'bold', color: theme === 'dark' ? '#e5e7eb' : '#374151' }}>Subject {index + 1}</Text>
+                        {editSubjects.length > 1 && (
+                          <TouchableOpacity onPress={() => handleRemoveEditSubject(sub.id)}>
+                            <Text style={{ color: '#ef4444', fontWeight: 'bold' }}>Remove</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { marginBottom: 10 }]} placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} placeholder="Name" value={sub.name} onChangeText={(val) => updateEditSubject(sub.id, 'name', val)} />
+                      <View style={styles.doseInputRow}>
+                        <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={styles.doseAmountInput} placeholder="Target Dose" keyboardType="numeric" value={sub.doseAmount} onChangeText={(val) => updateEditSubject(sub.id, 'doseAmount', val)} />
+                        <View style={styles.unitToggleContainer}>
+                          <TouchableOpacity style={[styles.unitToggleBtn, sub.doseUnit === 'mcg' && styles.unitToggleBtnActive]} onPress={() => updateEditSubject(sub.id, 'doseUnit', 'mcg')}>
+                            <Text style={[styles.unitButtonText, sub.doseUnit === 'mcg' && styles.unitButtonTextActive]}>mcg</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={[styles.unitToggleBtn, sub.doseUnit === 'mg' && styles.unitToggleBtnActive]} onPress={() => updateEditSubject(sub.id, 'doseUnit', 'mg')}>
+                            <Text style={[styles.unitButtonText, sub.doseUnit === 'mg' && styles.unitButtonTextActive]}>mg</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                  <TouchableOpacity style={{ padding: 10, backgroundColor: theme === 'dark' ? '#374151' : '#ffffff', borderRadius: 8, alignItems: 'center', marginBottom: 15, borderStyle: 'dashed', borderWidth: 1, borderColor: theme === 'dark' ? '#4b5563' : '#d1d5db' }} onPress={handleAddEditSubject}>
+                    <Text style={{ color: theme === 'dark' ? '#9ca3af' : '#6b7280', fontWeight: '600', fontSize: 13 }}>+ Add another person</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.label}>Target Dose Amount</Text>
+                  <View style={styles.doseInputRow}>
+                    <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} 
+                      style={styles.doseAmountInput} 
+                      value={editDose} 
+                      onChangeText={setEditDose} 
+                      keyboardType="numeric" 
+                      placeholder="e.g. 2.5"
+                    />
+                    <View style={styles.unitToggleContainer}>
+                      <TouchableOpacity 
+                        style={[styles.unitToggleBtn, editUnit === 'mcg' && styles.unitToggleBtnActive]}
+                        onPress={() => setEditUnit('mcg')}
+                      >
+                        <Text style={[styles.unitButtonText, editUnit === 'mcg' && styles.unitButtonTextActive]}>mcg</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.unitToggleBtn, editUnit === 'mg' && styles.unitToggleBtnActive]}
+                        onPress={() => setEditUnit('mg')}
+                      >
+                        <Text style={[styles.unitButtonText, editUnit === 'mg' && styles.unitButtonTextActive]}>mg</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </>
+              )}
+
             <View style={{ marginTop: 10, marginBottom: 5, borderTopWidth: 1, borderColor: '#e5e7eb', paddingTop: 10 }}>
               <Text style={styles.label}>Inventory</Text>
               {editInventory.map((inv) => (
                 <View key={inv.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
-                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Size (mg)" keyboardType="numeric" value={inv.mg} onChangeText={(val) => updateEditInventory(inv.id, 'mg', val)} />
-                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Count" keyboardType="numeric" value={inv.count} onChangeText={(val) => updateEditInventory(inv.id, 'count', val)} />
+                  <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Size (mg)" keyboardType="numeric" value={inv.mg} onChangeText={(val) => updateEditInventory(inv.id, 'mg', val)} />
+                  <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Count" keyboardType="numeric" value={inv.count} onChangeText={(val) => updateEditInventory(inv.id, 'count', val)} />
                   {editInventory.length > 1 && (
                     <TouchableOpacity style={{ paddingHorizontal: 10, paddingVertical: 12, backgroundColor: '#fee2e2', borderRadius: 8, justifyContent: 'center' }} onPress={() => handleRemoveEditInventoryRow(inv.id)}>
                       <Text style={{color: '#ef4444', fontWeight: 'bold'}}>X</Text>
@@ -170,7 +242,6 @@ export default function VialsScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-              {/* Custom Day Picker */}
               { (editFreq === 'Specific Days' || editFreq === 'Specific Days') && (
                 <View style={styles.dayPickerRow}>
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
@@ -187,7 +258,6 @@ export default function VialsScreen() {
                 </View>
               )}
 
-              {/* NEW: Time of Day Toggle */}
               <Text style={styles.label}>Time of Day</Text>
               <View style={styles.unitToggleRow}>
                 {timeOptions.map(time => (
@@ -207,15 +277,18 @@ export default function VialsScreen() {
                 />
               ))}
             </View>
+              </ScrollView>
 
               <View style={styles.modalActionRow}>
                 <TouchableOpacity style={styles.modalCancel} onPress={() => setEditModalVisible(false)}>
                   <Text style={{color: '#6b7280', fontWeight:'bold'}}>Cancel</Text>
                 </TouchableOpacity>
-                {/* NEW: Passed editTime into the update function */}
                 <TouchableOpacity style={styles.modalSave} onPress={() => { 
                   const mappedInventory = editInventory.filter(i => i.mg && i.count).map(i => ({ mg: parseFloat(i.mg) || 0, count: parseInt(i.count) || 0 }));
-                  updateVial(activeVial.id, editDose, editUnit, editFreq, editTime, selectedDays, mappedInventory, editColor, editStartDate); 
+                  const finalDose = editIsMultiSubject ? 0 : editDose;
+                  const finalUnit = editIsMultiSubject ? 'mcg' : editUnit;
+                  const finalSubjects = editIsMultiSubject ? editSubjects : undefined;
+                  updateVial(activeVial.id, finalDose, finalUnit, editFreq, editTime, selectedDays, mappedInventory, editColor, editStartDate, finalSubjects); 
                   setEditModalVisible(false); 
                 }}>
                   <Text style={{color:'#fff', fontWeight:'bold'}}>Save</Text>
@@ -233,16 +306,32 @@ export default function VialsScreen() {
             <View style={styles.modalContent}>
               <Text style={styles.sectionTitle}>Log Past Injection</Text>
               
-              {/* DATE SELECTOR */}
+              {activeVial.subjects && activeVial.subjects.length > 0 && (
+                <>
+                  <Text style={styles.label}>Select Person</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 15 }}>
+                    {activeVial.subjects.map(sub => (
+                      <TouchableOpacity 
+                        key={sub.id} 
+                        style={{ padding: 10, borderWidth: 1, borderColor: pastLogSubjectId === sub.id ? '#3b82f6' : '#d1d5db', borderRadius: 8, backgroundColor: pastLogSubjectId === sub.id ? '#eff6ff' : '#fff' }}
+                        onPress={() => setPastLogSubjectId(sub.id)}
+                      >
+                        <Text style={{ color: pastLogSubjectId === sub.id ? '#1e40af' : '#374151', fontWeight: 'bold' }}>{sub.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+
               <DateInput 
                 label="Select Date" 
                 value={pastDateInput} 
                 onChange={setPastDateInput} 
               />
-              {/* DOSE OVERRIDE INPUTS */}
+              
               <Text style={styles.label}>Dose Administered</Text>
               <View style={styles.doseInputRow}>
-                <TextInput 
+                <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} 
                   style={styles.doseAmountInput} 
                   value={pastDoseAmount} 
                   onChangeText={setPastDoseAmount} 
@@ -265,23 +354,26 @@ export default function VialsScreen() {
                 </View>
               </View>
 
-              {/* SAVE / CANCEL */}
               <View style={styles.modalActionRow}>
                 <TouchableOpacity style={styles.modalCancel} onPress={() => setLogModalVisible(false)}>
                   <Text style={styles.cancelText}>Cancel</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity style={styles.modalSave} onPress={() => { 
-                  const numericAmount = parseFloat(pastDoseAmount) || 0;
-                  const calculatedMcg = pastDoseUnit === 'mg' ? numericAmount * 1000 : numericAmount;
-                  
-                  logInjection(
-                    activeVial.id, 
-                    numericAmount, 
-                    pastDoseUnit, 
-                    calculatedMcg, 
-                    pastDateInput
-                  ); 
+                  if (activeVial.subjects && activeVial.subjects.length > 0) {
+                    if (!pastLogSubjectId) {
+                      Alert.alert("Missing Subject", "Please select who took the injection.");
+                      return;
+                    }
+                    const subject = activeVial.subjects.find(s => s.id === pastLogSubjectId);
+                    const numericAmount = parseFloat(pastDoseAmount) || 0;
+                    const calculatedMcg = pastDoseUnit === 'mg' ? numericAmount * 1000 : numericAmount;
+                    logInjection(activeVial.id, numericAmount, pastDoseUnit, calculatedMcg, pastDateInput, subject.id, subject.name);
+                  } else {
+                    const numericAmount = parseFloat(pastDoseAmount) || 0;
+                    const calculatedMcg = pastDoseUnit === 'mg' ? numericAmount * 1000 : numericAmount;
+                    logInjection(activeVial.id, numericAmount, pastDoseUnit, calculatedMcg, pastDateInput); 
+                  }
                   
                   setLogModalVisible(false); 
                 }}>
@@ -323,7 +415,7 @@ export default function VialsScreen() {
               </TouchableOpacity>
 
               <Text style={styles.label}>Bac Water (ml)</Text>
-              <TextInput 
+              <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} 
                 style={styles.input} 
                 keyboardType="numeric" 
                 value={nextVialBacWaterMl} 
@@ -333,7 +425,7 @@ export default function VialsScreen() {
 
               <Text style={styles.label}>Target Dose Amount</Text>
               <View style={styles.doseInputRow}>
-                <TextInput 
+                <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} 
                   style={styles.doseAmountInput} 
                   value={nextVialDoseAmount} 
                   onChangeText={setNextVialDoseAmount} 

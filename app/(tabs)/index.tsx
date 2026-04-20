@@ -85,28 +85,77 @@ export default function ScheduleScreen() {
   const pmVials = scheduledVials.filter(v => v.timeOfDay === 'PM');
   const anyVials = scheduledVials.filter(v => !v.timeOfDay || v.timeOfDay === 'Any');
 
-  const handleQuickLog = (vial) => {
-    const rawDoseAmount = vial.doseAmount || vial.doseMcg;
-    const unit = vial.doseUnit || 'mcg';
+  const handleQuickLog = (vial, subject = null) => {
+    const rawDoseAmount = subject ? subject.doseAmount : (vial.doseAmount || vial.doseMcg);
+    const unit = subject ? subject.doseUnit : (vial.doseUnit || 'mcg');
+    const mcg = subject ? subject.doseMcg : vial.doseMcg;
     const dateToLog = isSelectedToday ? null : selectedDate.toISOString();
+    const whoText = subject ? ` for ${subject.name}` : '';
     
-    Alert.alert("Log Injection", `Log ${rawDoseAmount}${unit} of ${vial.vialName || vial.name} for ${selectedDateString}?`, [
+    Alert.alert("Log Injection", `Log ${rawDoseAmount}${unit} of ${vial.vialName || vial.name}${whoText} for ${selectedDateString}?`, [
       { text: "Cancel", style: "cancel" },
-      { text: "Log It", onPress: () => logInjection(vial.id, rawDoseAmount, unit, vial.doseMcg, dateToLog) }
+      { text: "Log It", onPress: () => logInjection(vial.id, rawDoseAmount, unit, mcg, dateToLog, subject ? subject.id : null, subject ? subject.name : null) }
     ]);
   };
 
   const renderVialRow = (vial, borderStyle) => {
     const activePeptides = vial.peptides && vial.peptides.length > 0 ? vial.peptides : [{ name: vial.name, mg: vial.vialMg }];
     const primaryPeptide = activePeptides[0];
-    const rawDoseAmount = vial.doseAmount || vial.doseMcg;
-    const unit = vial.doseUnit || 'mcg';
-    
     const concentrationMgPerMl = primaryPeptide.mg / vial.bacWaterMl;
-    const volumeMl = (vial.doseMcg / 1000) / concentrationMgPerMl;
-    const units = (volumeMl * 100).toFixed(1);
 
     const hasLoggedOnSelectedDate = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
+
+    if (vial.subjects && vial.subjects.length > 0) {
+      // MULTI-SUBJECT RENDER
+      // In a multi-subject protocol, the protocol is considered "logged today" if AT LEAST one subject has logged today.
+      const hasAnyLogged = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
+
+      return (
+        <View key={vial.id} style={[
+          styles.dashCard, 
+          { borderLeftColor: hasAnyLogged ? styles.dashCardDone.borderLeftColor : (vial.color || '#3b82f6') },
+          hasAnyLogged && styles.dashCardDone
+        ]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.dashVialName, hasAnyLogged && styles.dashTextDone]}>{vial.vialName || vial.name}</Text>
+            {vial.subjects.map(s => {
+              const volumeMl = (s.doseMcg / 1000) / concentrationMgPerMl;
+              const units = (volumeMl * 100).toFixed(1);
+              const hasSubjectLogged = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString && log.subjectId === s.id);
+              return (
+                <View key={s.id} style={{ marginBottom: 6 }}>
+                  <Text style={[styles.dashDose, hasSubjectLogged && styles.dashTextDone]}>{s.name}: {s.doseAmount}{s.doseUnit} ({primaryPeptide.name})</Text>
+                  <Text style={[styles.dashUnits, hasSubjectLogged && styles.dashTextDone]}>Pull: {units} Units</Text>
+                </View>
+              );
+            })}
+          </View>
+          
+          <View style={{ justifyContent: 'center', gap: 5 }}>
+            {vial.subjects.map(s => {
+              const hasSubjectLogged = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString && log.subjectId === s.id);
+              if (hasSubjectLogged) {
+                return <View key={s.id} style={styles.dashLogBtnDone}><Text style={styles.dashLogTextDone}>✓ {s.name}</Text></View>;
+              } else if (isFutureDate) {
+                return <View key={s.id} style={styles.dashUpcomingBadge}><Text style={styles.dashUpcomingText}>Upcoming</Text></View>;
+              } else {
+                return (
+                  <TouchableOpacity key={s.id} style={styles.dashLogBtn} onPress={() => handleQuickLog(vial, s)}>
+                    <Text style={styles.dashLogText}>✓ {s.name}</Text>
+                  </TouchableOpacity>
+                );
+              }
+            })}
+          </View>
+        </View>
+      );
+    }
+
+    // SINGLE SUBJECT RENDER
+    const rawDoseAmount = vial.doseAmount || vial.doseMcg;
+    const unit = vial.doseUnit || 'mcg';
+    const volumeMl = (vial.doseMcg / 1000) / concentrationMgPerMl;
+    const units = (volumeMl * 100).toFixed(1);
 
     return (
       <View key={vial.id} style={[

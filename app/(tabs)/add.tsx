@@ -22,6 +22,9 @@ export default function AddScreen() {
   const [doseUnit, setDoseUnit] = useState('mcg'); 
   const [frequency, setFrequency] = useState('Daily');
   
+  const [isMultiSubject, setIsMultiSubject] = useState(false);
+  const [subjects, setSubjects] = useState([{ id: '1', name: '', doseAmount: '', doseUnit: 'mcg' }]);
+  
   // Date Picker State
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [reconstitutedDate, setReconstitutedDate] = useState('');
@@ -51,11 +54,20 @@ export default function AddScreen() {
   };
   const updateInventory = (id, field, value) => setInventory(inventory.map(i => i.id === id ? { ...i, [field]: value } : i));
 
+  const handleAddSubject = () => setSubjects([...subjects, { id: Date.now().toString(), name: '', doseAmount: '', doseUnit: 'mcg' }]);
+  const handleRemoveSubject = (id) => {
+    if (subjects.length === 1) return;
+    setSubjects(subjects.filter(s => s.id !== id));
+  };
+  const updateSubject = (id, field, value) => setSubjects(subjects.map(s => s.id === id ? { ...s, [field]: value } : s));
+
 
   const handleAdd = () => {
     const hasEmptyPeptides = peptides.some(p => !p.name || !p.mg);
-    if (!vialName || hasEmptyPeptides || !bacWaterMl || !doseAmount) {
-      Alert.alert("Missing Info", "Please fill out the vial name, all peptide details, bac water, and target dose.");
+    const hasEmptySubjects = isMultiSubject && subjects.some(s => !s.name || !s.doseAmount);
+    
+    if (!vialName || hasEmptyPeptides || !bacWaterMl || (!isMultiSubject && !doseAmount) || hasEmptySubjects) {
+      Alert.alert("Missing Info", "Please fill out all required fields.");
       return;
     }
 
@@ -64,9 +76,10 @@ export default function AddScreen() {
       vialName: vialName,
       peptides: peptides.map(p => ({ name: p.name, mg: parseFloat(p.mg) })),
       bacWaterMl: parseFloat(bacWaterMl),
-      doseAmount: parseFloat(doseAmount),
-      doseUnit: doseUnit,
-      doseMcg: doseUnit === 'mg' ? parseFloat(doseAmount) * 1000 : parseFloat(doseAmount),
+      doseAmount: isMultiSubject ? 0 : parseFloat(doseAmount),
+      doseUnit: isMultiSubject ? 'mcg' : doseUnit,
+      doseMcg: isMultiSubject ? 0 : (doseUnit === 'mg' ? parseFloat(doseAmount) * 1000 : parseFloat(doseAmount)),
+      subjects: isMultiSubject ? subjects : undefined,
       frequency,
       selectedDays,
       inventory: inventory.filter(i => i.mg && i.count).map(i => ({ mg: parseFloat(i.mg) || 0, count: parseInt(i.count) || 0 })),
@@ -92,14 +105,14 @@ export default function AddScreen() {
             <Text style={styles.sectionTitle}>Add New Vial</Text>
             
             <Text style={styles.label}>Vial / Blend Name</Text>
-            <TextInput style={styles.input} placeholder="e.g. Glow, Recovery Blend, or BPC-157" value={vialName} onChangeText={setVialName} />
+            <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={styles.input} placeholder="e.g. Glow, Recovery Blend, or BPC-157" value={vialName} onChangeText={setVialName} />
 
             <View style={{ marginTop: 10, marginBottom: 5, borderTopWidth: 1, borderColor: '#e5e7eb', paddingTop: 10 }}>
               <Text style={styles.label}>Peptides in this Vial</Text>
               {peptides.map((pep) => (
                 <View key={pep.id} style={styles.blendRow}>
-                  <TextInput style={[styles.input, { flex: 2, marginBottom: 0 }]} placeholder="Name (e.g. GHK-Cu)" value={pep.name} onChangeText={(val) => updatePeptide(pep.id, 'name', val)} />
-                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="mg" keyboardType="numeric" value={pep.mg} onChangeText={(val) => updatePeptide(pep.id, 'mg', val)} />
+                  <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { flex: 2, marginBottom: 0 }]} placeholder="Name (e.g. GHK-Cu)" value={pep.name} onChangeText={(val) => updatePeptide(pep.id, 'name', val)} />
+                  <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="mg" keyboardType="numeric" value={pep.mg} onChangeText={(val) => updatePeptide(pep.id, 'mg', val)} />
                   {peptides.length > 1 && (
                     <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemovePeptideRow(pep.id)}>
                       <Text style={{color: '#ef4444', fontWeight: 'bold'}}>X</Text>
@@ -113,21 +126,65 @@ export default function AddScreen() {
             </View>
 
             <Text style={styles.label}>Bac Water (ml)</Text>
-            <TextInput style={styles.input} placeholder="2" keyboardType="numeric" value={bacWaterMl} onChangeText={setBacWaterMl} />
+            <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={styles.input} placeholder="2" keyboardType="numeric" value={bacWaterMl} onChangeText={setBacWaterMl} />
 
-            <Text style={styles.label}>Target Dose for {peptides[0].name || 'Primary Peptide'}</Text>
-            <View style={styles.doseInputRow}>
-              <TextInput style={styles.doseAmountInput} placeholder="e.g. 2.5" keyboardType="numeric" value={doseAmount} onChangeText={setDoseAmount} />
-              <View style={styles.unitToggleContainer}>
-                <TouchableOpacity style={[styles.unitToggleBtn, doseUnit === 'mcg' && styles.unitToggleBtnActive]} onPress={() => setDoseUnit('mcg')}>
-                  <Text style={[styles.unitButtonText, doseUnit === 'mcg' && styles.unitButtonTextActive]}>mcg</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.unitToggleBtn, doseUnit === 'mg' && styles.unitToggleBtnActive]} onPress={() => setDoseUnit('mg')}>
-                  <Text style={[styles.unitButtonText, doseUnit === 'mg' && styles.unitButtonTextActive]}>mg</Text>
-                </TouchableOpacity>
-
-              </View>
+            {/* Multi Subject Toggle */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 10 }}>
+              <Text style={styles.label}>Track for multiple people?</Text>
+              <TouchableOpacity onPress={() => setIsMultiSubject(!isMultiSubject)}>
+                <View style={{ width: 50, height: 28, borderRadius: 14, backgroundColor: isMultiSubject ? '#3b82f6' : (theme === 'dark' ? '#374151' : '#e5e7eb'), justifyContent: 'center', padding: 2 }}>
+                  <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff', transform: [{ translateX: isMultiSubject ? 22 : 0 }] }} />
+                </View>
+              </TouchableOpacity>
             </View>
+
+            {isMultiSubject ? (
+              <View style={{ marginBottom: 10 }}>
+                <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 10 }}>Add a name and custom target dose for everyone taking this injection.</Text>
+                {subjects.map((sub, index) => (
+                  <View key={sub.id} style={{ marginBottom: 10, padding: 10, backgroundColor: theme === 'dark' ? '#1f2937' : '#f9fafb', borderRadius: 8, borderWidth: 1, borderColor: theme === 'dark' ? '#374151' : '#e5e7eb' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                      <Text style={{ fontWeight: 'bold', color: theme === 'dark' ? '#e5e7eb' : '#374151' }}>Subject {index + 1}</Text>
+                      {subjects.length > 1 && (
+                        <TouchableOpacity onPress={() => handleRemoveSubject(sub.id)}>
+                          <Text style={{ color: '#ef4444', fontWeight: 'bold' }}>Remove</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { marginBottom: 10 }]} placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} placeholder="Name (e.g. John)" value={sub.name} onChangeText={(val) => updateSubject(sub.id, 'name', val)} />
+                    <View style={styles.doseInputRow}>
+                      <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={styles.doseAmountInput} placeholder="Target Dose (e.g. 2.5)" keyboardType="numeric" value={sub.doseAmount} onChangeText={(val) => updateSubject(sub.id, 'doseAmount', val)} />
+                      <View style={styles.unitToggleContainer}>
+                        <TouchableOpacity style={[styles.unitToggleBtn, sub.doseUnit === 'mcg' && styles.unitToggleBtnActive]} onPress={() => updateSubject(sub.id, 'doseUnit', 'mcg')}>
+                          <Text style={[styles.unitButtonText, sub.doseUnit === 'mcg' && styles.unitButtonTextActive]}>mcg</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.unitToggleBtn, sub.doseUnit === 'mg' && styles.unitToggleBtnActive]} onPress={() => updateSubject(sub.id, 'doseUnit', 'mg')}>
+                          <Text style={[styles.unitButtonText, sub.doseUnit === 'mg' && styles.unitButtonTextActive]}>mg</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+                <TouchableOpacity style={[styles.addBlendBtn, { backgroundColor: theme === 'dark' ? '#374151' : '#ffffff' }]} onPress={handleAddSubject}>
+                  <Text style={styles.addBlendText}>+ Add another person</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.label}>Target Dose for {peptides[0].name || 'Primary Peptide'}</Text>
+                <View style={styles.doseInputRow}>
+                  <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={styles.doseAmountInput} placeholder="e.g. 2.5" keyboardType="numeric" value={doseAmount} onChangeText={setDoseAmount} />
+                  <View style={styles.unitToggleContainer}>
+                    <TouchableOpacity style={[styles.unitToggleBtn, doseUnit === 'mcg' && styles.unitToggleBtnActive]} onPress={() => setDoseUnit('mcg')}>
+                      <Text style={[styles.unitButtonText, doseUnit === 'mcg' && styles.unitButtonTextActive]}>mcg</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.unitToggleBtn, doseUnit === 'mg' && styles.unitToggleBtnActive]} onPress={() => setDoseUnit('mg')}>
+                      <Text style={[styles.unitButtonText, doseUnit === 'mg' && styles.unitButtonTextActive]}>mg</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </>
+            )}
 
             <Text style={styles.label}>Injection Frequency</Text>
             {/* Custom Day Picker */}
@@ -169,8 +226,8 @@ export default function AddScreen() {
               <Text style={styles.label}>Inventory</Text>
               {inventory.map((inv) => (
                 <View key={inv.id} style={styles.blendRow}>
-                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Size (mg)" keyboardType="numeric" value={inv.mg} onChangeText={(val) => updateInventory(inv.id, 'mg', val)} />
-                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Count" keyboardType="numeric" value={inv.count} onChangeText={(val) => updateInventory(inv.id, 'count', val)} />
+                  <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Size (mg)" keyboardType="numeric" value={inv.mg} onChangeText={(val) => updateInventory(inv.id, 'mg', val)} />
+                  <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Count" keyboardType="numeric" value={inv.count} onChangeText={(val) => updateInventory(inv.id, 'count', val)} />
                   {inventory.length > 1 && (
                     <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveInventoryRow(inv.id)}>
                       <Text style={{color: '#ef4444', fontWeight: 'bold'}}>X</Text>
