@@ -16,7 +16,7 @@ export default function AddScreen() {
   const [vialName, setVialName] = useState('');
   const [peptides, setPeptides] = useState([{ id: '1', name: '', mg: '' }]);
   const [bacWaterMl, setBacWaterMl] = useState('');
-  const [unopenedVials, setUnopenedVials] = useState('0');
+  const [inventory, setInventory] = useState([{ id: '1', mg: '', count: '0' }]);
   
   const [doseAmount, setDoseAmount] = useState('');
   const [doseUnit, setDoseUnit] = useState('mcg'); 
@@ -44,6 +44,13 @@ export default function AddScreen() {
   };
   const updatePeptide = (id, field, value) => setPeptides(peptides.map(p => p.id === id ? { ...p, [field]: value } : p));
 
+  const handleAddInventoryRow = () => setInventory([...inventory, { id: Date.now().toString(), mg: '', count: '0' }]);
+  const handleRemoveInventoryRow = (id) => {
+    if (inventory.length === 1) return;
+    setInventory(inventory.filter(i => i.id !== id));
+  };
+  const updateInventory = (id, field, value) => setInventory(inventory.map(i => i.id === id ? { ...i, [field]: value } : i));
+
 
   const handleAdd = () => {
     const hasEmptyPeptides = peptides.some(p => !p.name || !p.mg);
@@ -62,7 +69,7 @@ export default function AddScreen() {
       doseMcg: doseUnit === 'mg' ? parseFloat(doseAmount) * 1000 : parseFloat(doseAmount),
       frequency,
       selectedDays,
-      unopenedVials: parseInt(unopenedVials) || 0,
+      inventory: inventory.filter(i => i.mg && i.count).map(i => ({ mg: parseFloat(i.mg) || 0, count: parseInt(i.count) || 0 })),
       color,
       startDate,
       timeOfDay: timeOfDay,
@@ -73,7 +80,7 @@ export default function AddScreen() {
 
     addVial(newVial);
     
-    setVialName(''); setPeptides([{ id: '1', name: '', mg: '' }]); setBacWaterMl(''); setDoseAmount(''); setReconstitutedDate('');
+    setVialName(''); setPeptides([{ id: '1', name: '', mg: '' }]); setBacWaterMl(''); setDoseAmount(''); setReconstitutedDate(''); setInventory([{ id: '1', mg: '', count: '0' }]);
     router.push('/');
   };
 
@@ -158,8 +165,23 @@ export default function AddScreen() {
               ))}
             </View>
 
-            <Text style={styles.label}>Inventory (Unopened Vials)</Text>
-            <TextInput style={styles.input} placeholder="e.g. 2" keyboardType="numeric" value={unopenedVials} onChangeText={setUnopenedVials} />
+            <View style={{ marginTop: 10, marginBottom: 5, borderTopWidth: 1, borderColor: '#e5e7eb', paddingTop: 10 }}>
+              <Text style={styles.label}>Inventory</Text>
+              {inventory.map((inv) => (
+                <View key={inv.id} style={styles.blendRow}>
+                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Size (mg)" keyboardType="numeric" value={inv.mg} onChangeText={(val) => updateInventory(inv.id, 'mg', val)} />
+                  <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Count" keyboardType="numeric" value={inv.count} onChangeText={(val) => updateInventory(inv.id, 'count', val)} />
+                  {inventory.length > 1 && (
+                    <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveInventoryRow(inv.id)}>
+                      <Text style={{color: '#ef4444', fontWeight: 'bold'}}>X</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+              <TouchableOpacity style={styles.addBlendBtn} onPress={handleAddInventoryRow}>
+                <Text style={styles.addBlendText}>+ Add another inventory size</Text>
+              </TouchableOpacity>
+            </View>
             
             <Text style={styles.label}>Vial Color Tag</Text>
             <View style={styles.colorPickerRow}>

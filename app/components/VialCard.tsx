@@ -3,10 +3,10 @@ import { Alert, Text, TouchableOpacity, View, useColorScheme } from 'react-nativ
 import { VialContext } from '../_context/VialContext';
 import { getStyles } from '../theme';
 
-export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, onEdit, onLogPast }) {
+export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, onEdit, onLogPast, onStartNextVial }) {
   const theme = useColorScheme() ?? 'light';
   const styles = getStyles(theme);
-  const { toggleArchive, deleteVial, logInjection, deleteLog, startNextVial } = useContext(VialContext);
+  const { toggleArchive, deleteVial, logInjection, deleteLog } = useContext(VialContext);
 
   const activePeptides = vial.peptides && vial.peptides.length > 0 ? vial.peptides : [{ name: vial.name, mg: vial.vialMg }];
   const vialTitle = vial.vialName || vial.name || "Unnamed Vial";
@@ -37,9 +37,10 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
   const remainingDosesCurrent = Math.floor((totalMcgInVial - mcgUsedThisVial) / vial.doseMcg);
   
   // CYCLE MATH (Current Remaining Vial + Inventory)
-  const inventoryCount = vial.unopenedVials || 0;
+  const totalInventoryMg = (vial.inventory || []).reduce((sum, inv) => sum + (inv.mg * inv.count), 0);
+  const inventoryCount = (vial.inventory || []).reduce((sum, inv) => sum + inv.count, 0);
   const completedCount = vial.completedVials || 0;
-  const totalCycleMgLeft = ((totalMcgInVial - mcgUsedThisVial) / 1000) + (inventoryCount * primaryPeptide.mg);
+  const totalCycleMgLeft = ((totalMcgInVial - mcgUsedThisVial) / 1000) + totalInventoryMg;
   const totalCycleDosesLeft = Math.floor(totalCycleMgLeft / currentDoseMg);
 
   const sortedLogs = [...vial.logs].sort((a, b) => {
@@ -50,18 +51,9 @@ export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, o
   const logsToShow = isExpanded ? sortedLogs : sortedLogs.slice(0, 1);
 
   const handleStartNext = () => {
-    Alert.alert(
-      "Start Next Vial", 
-      "This will mark your current vial as empty, clear the injection history for this specific vial, and pull one from your inventory. Continue?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Start Next", onPress: () => {
-            const today = new Date().toISOString().split('T')[0];
-            startNextVial(vial.id, today);
-          }
-        }
-      ]
-    );
+    if (onStartNextVial) {
+      onStartNextVial(vial);
+    }
   };
 
   return (

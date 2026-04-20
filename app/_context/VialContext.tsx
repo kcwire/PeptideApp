@@ -31,7 +31,20 @@ export const VialProvider = ({ children }) => {
   const loadVials = async () => {
     try {
       const savedVials = await AsyncStorage.getItem('@peptide_vials');
-      if (savedVials !== null) setVials(JSON.parse(savedVials));
+      if (savedVials !== null) {
+        let parsed = JSON.parse(savedVials);
+        parsed = parsed.map(vial => {
+          if (!vial.inventory) {
+            vial.inventory = [];
+            if (vial.unopenedVials && vial.unopenedVials > 0) {
+              const mainMg = vial.peptides && vial.peptides.length > 0 ? vial.peptides[0].mg : (vial.vialMg || 0);
+              vial.inventory.push({ mg: mainMg, count: vial.unopenedVials });
+            }
+          }
+          return vial;
+        });
+        setVials(parsed);
+      }
     } catch (error) {
       console.error('Failed to load vials', error);
     }
@@ -49,12 +62,14 @@ export const VialProvider = ({ children }) => {
     // Grab today's date in YYYY-MM-DD format
     const todayStr = new Date().toISOString().split('T')[0]; 
     
+    const inventory = newVial.inventory || [];
+    
     const vialWithInventory = {
       ...newVial,
       startDate: newVial.startDate || todayStr, // Protocol Start Date
       dateReconstituted: newVial.dateReconstituted || todayStr, // The physical bottle date
       color: newVial.color || '#3b82f6',
-      unopenedVials: newVial.unopenedVials || 0,
+      inventory: inventory,
       completedVials: 0
     };
     
@@ -64,20 +79,20 @@ export const VialProvider = ({ children }) => {
   };
 
   // ADDED color to the end of the arguments!
-  const updateVial = (id, doseAmount, doseUnit, frequency, timeOfDay, selectedDays, unopenedVials, color, startDate) => {
+  const updateVial = (id, doseAmount, doseUnit, frequency, timeOfDay, selectedDays, inventory, color, startDate) => {
     const doseMcg = doseUnit === 'mg' ? parseFloat(doseAmount) * 1000 : parseFloat(doseAmount);
     const updatedVials = vials.map(v => 
       v.id === id ? { 
         ...v, doseAmount: parseFloat(doseAmount), doseUnit, doseMcg, frequency, timeOfDay, selectedDays, color,
         startDate: startDate || v.startDate, 
-        unopenedVials: unopenedVials !== undefined ? parseInt(unopenedVials) || 0 : v.unopenedVials
+        inventory: inventory || v.inventory || []
       } : v
     );
     setVials(updatedVials);
     saveVials(updatedVials);
   };
 
-  const startNextVial = (id) => {
+  const startNextVial = (id, inventoryIndex, newBacWaterMl, newDoseAmount, newDoseUnit) => {
     // 1. Get a timezone-safe YYYY-MM-DD string for "today"
     const today = new Date();
     const year = today.getFullYear();
@@ -88,15 +103,39 @@ export const VialProvider = ({ children }) => {
     // 2. Update the specific vial's lifecycle data
     const updatedVials = vials.map(vial => {
       if (vial.id === id) {
+        let updatedInventory = [...(vial.inventory || [])];
+        let primaryMg = vial.peptides && vial.peptides.length > 0 ? vial.peptides[0].mg : 0;
+        
+        if (inventoryIndex !== undefined && inventoryIndex !== null && inventoryIndex >= 0 && updatedInventory[inventoryIndex]) {
+          const selectedInv = updatedInventory[inventoryIndex];
+          primaryMg = selectedInv.mg;
+          if (selectedInv.count > 0) {
+            updatedInventory[inventoryIndex] = { ...selectedInv, count: selectedInv.count - 1 };
+          }
+        } else if (inventoryIndex === -1) {
+          // Selected "Other (Not in Inventory)" so we don't decrement any inventory count, but the size could have changed?
+          // Actually, if we allow changing size without inventory, we'd need another parameter. 
+          // For now, if -1, we assume no inventory change and user keeps current size.
+        }
+
+        let newPeptides = [...(vial.peptides || [])];
+        if (newPeptides.length > 0) {
+          newPeptides[0] = { ...newPeptides[0], mg: primaryMg };
+        }
+
+        const parsedDoseAmount = parseFloat(newDoseAmount) || vial.doseAmount;
+        const doseMcg = newDoseUnit === 'mg' ? parsedDoseAmount * 1000 : parsedDoseAmount;
+
         return {
           ...vial,
-          // Decrement inventory (safeguard against going below 0)
-          unopenedVials: Math.max(0, vial.unopenedVials - 1),
-          // Increment completed graveyard
+          inventory: updatedInventory,
+          peptides: newPeptides,
+          bacWaterMl: parseFloat(newBacWaterMl) || vial.bacWaterMl,
+          doseAmount: parsedDoseAmount,
+          doseUnit: newDoseUnit || vial.doseUnit,
+          doseMcg: doseMcg,
           completedVials: (vial.completedVials || 0) + 1,
-          // Reset the physical bottle's mix date to right now
           reconstitutedDate: todayStr 
-          // Notice we DO NOT touch `startDate` or `logs` so your protocol history is preserved!
         };
       }
       return vial;
