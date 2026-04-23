@@ -2,7 +2,7 @@ import React, { useContext, useState } from 'react';
 import DateInput from '../components/DateInput';
 import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VialContext } from '../_context/VialContext';
+import { VialContext, safeFloat, safeInt } from '../_context/VialContext';
 import VialCard from '../components/VialCard';
 import { getStyles, vialColors } from '../theme';
 
@@ -291,7 +291,7 @@ export default function VialsScreen() {
                   <Text style={{color: '#6b7280', fontWeight:'bold'}}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.modalSave} onPress={() => { 
-                  const mappedInventory = editInventory.filter(i => i.mg && i.count).map(i => ({ mg: parseFloat(i.mg) || 0, count: parseInt(i.count) || 0 }));
+                  const mappedInventory = editInventory.filter(i => i.mg && i.count).map(i => ({ mg: safeFloat(i.mg) || 0, count: safeInt(i.count) || 0 }));
                   const finalDose = editIsMultiSubject ? 0 : editDose;
                   const finalUnit = editIsMultiSubject ? 'mcg' : editUnit;
                   const finalSubjects = editIsMultiSubject ? editSubjects : undefined;
@@ -373,11 +373,11 @@ export default function VialsScreen() {
                       return;
                     }
                     const subject = activeVial.subjects.find(s => s.id === pastLogSubjectId);
-                    const numericAmount = parseFloat(pastDoseAmount) || 0;
+                    const numericAmount = safeFloat(pastDoseAmount) || 0;
                     const calculatedMcg = pastDoseUnit === 'mg' ? numericAmount * 1000 : numericAmount;
                     logInjection(activeVial.id, numericAmount, pastDoseUnit, calculatedMcg, pastDateInput, subject.id, subject.name);
                   } else {
-                    const numericAmount = parseFloat(pastDoseAmount) || 0;
+                    const numericAmount = safeFloat(pastDoseAmount) || 0;
                     const calculatedMcg = pastDoseUnit === 'mg' ? numericAmount * 1000 : numericAmount;
                     logInjection(activeVial.id, numericAmount, pastDoseUnit, calculatedMcg, pastDateInput); 
                   }

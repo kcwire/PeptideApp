@@ -3,7 +3,7 @@ import DateInput from '../components/DateInput';
 import React, { useContext, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VialContext } from '../_context/VialContext';
+import { VialContext, safeFloat, safeInt } from '../_context/VialContext';
 import { getStyles, vialColors } from '../theme';
 
 export default function AddScreen() {
@@ -74,15 +74,15 @@ export default function AddScreen() {
     const newVial = {
       id: Date.now().toString(),
       vialName: vialName,
-      peptides: peptides.map(p => ({ name: p.name, mg: parseFloat(p.mg) })),
-      bacWaterMl: parseFloat(bacWaterMl),
-      doseAmount: isMultiSubject ? 0 : parseFloat(doseAmount),
+      peptides: peptides.map(p => ({ name: p.name, mg: safeFloat(p.mg) })),
+      bacWaterMl: safeFloat(bacWaterMl),
+      doseAmount: isMultiSubject ? 0 : safeFloat(doseAmount),
       doseUnit: isMultiSubject ? 'mcg' : doseUnit,
-      doseMcg: isMultiSubject ? 0 : (doseUnit === 'mg' ? parseFloat(doseAmount) * 1000 : parseFloat(doseAmount)),
+      doseMcg: isMultiSubject ? 0 : (doseUnit === 'mg' ? safeFloat(doseAmount) * 1000 : safeFloat(doseAmount)),
       subjects: isMultiSubject ? subjects : undefined,
       frequency,
       selectedDays,
-      inventory: inventory.filter(i => i.mg && i.count).map(i => ({ mg: parseFloat(i.mg) || 0, count: parseInt(i.count) || 0 })),
+      inventory: inventory.filter(i => i.mg && i.count).map(i => ({ mg: safeFloat(i.mg) || 0, count: safeInt(i.count) || 0 })),
       color,
       startDate,
       timeOfDay: timeOfDay,

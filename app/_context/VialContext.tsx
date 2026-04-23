@@ -4,6 +4,9 @@ import { Alert } from 'react-native';
 
 export const VialContext = createContext(null);
 
+export const safeFloat = (val) => { const n = parseFloat(val); return isNaN(n) ? 0 : n; };
+export const safeInt = (val) => { const n = parseInt(val, 10); return isNaN(n) ? 0 : n; };
+
 // Custom Date Formatter for React Native
 const formatDateTime = (inputDate) => {
   const d = inputDate ? new Date(inputDate) : new Date();
@@ -33,6 +36,17 @@ export const VialProvider = ({ children }) => {
       const savedVials = await AsyncStorage.getItem('@peptide_vials');
       if (savedVials !== null) {
         let parsed = JSON.parse(savedVials);
+        
+        // Fetch separate logs for vials that don't have them embedded (backward compatibility)
+        const keysToFetch = parsed.filter(v => !v.logs).map(v => `@peptide_logs_${v.id}`);
+        let logsMap = {};
+        if (keysToFetch.length > 0) {
+           const fetchedLogs = await AsyncStorage.multiGet(keysToFetch);
+           fetchedLogs.forEach(([key, value]) => {
+              logsMap[key] = value ? JSON.parse(value) : [];
+           });
+        }
+
         parsed = parsed.map(vial => {
           if (!vial.inventory) {
             vial.inventory = [];
@@ -40,6 +54,10 @@ export const VialProvider = ({ children }) => {
               const mainMg = vial.peptides && vial.peptides.length > 0 ? vial.peptides[0].mg : (vial.vialMg || 0);
               vial.inventory.push({ mg: mainMg, count: vial.unopenedVials });
             }
+          }
+          // Restore logs
+          if (!vial.logs) {
+             vial.logs = logsMap[`@peptide_logs_${vial.id}`] || [];
           }
           return vial;
         });
@@ -52,7 +70,12 @@ export const VialProvider = ({ children }) => {
 
   const saveVials = async (updatedVials) => {
     try {
-      await AsyncStorage.setItem('@peptide_vials', JSON.stringify(updatedVials));
+      const metadataOnly = updatedVials.map(({logs, ...rest}) => rest);
+      const multiSetPairs = [['@peptide_vials', JSON.stringify(metadataOnly)]];
+      updatedVials.forEach(vial => {
+         multiSetPairs.push([`@peptide_logs_${vial.id}`, JSON.stringify(vial.logs || [])]);
+      });
+      await AsyncStorage.multiSet(multiSetPairs);
     } catch (error) {
       console.error('Failed to save vials', error);
     }
@@ -67,7 +90,7 @@ export const VialProvider = ({ children }) => {
     // Process subjects if any
     const processedSubjects = (newVial.subjects || []).map(s => ({
       ...s,
-      doseMcg: s.doseUnit === 'mg' ? parseFloat(s.doseAmount) * 1000 : parseFloat(s.doseAmount)
+      doseMcg: s.doseUnit === 'mg' ? safeFloat(s.doseAmount) * 1000 : safeFloat(s.doseAmount)
     }));
     
     const vialWithInventory = {
@@ -87,16 +110,16 @@ export const VialProvider = ({ children }) => {
 
   // ADDED color to the end of the arguments!
   const updateVial = (id, doseAmount, doseUnit, frequency, timeOfDay, selectedDays, inventory, color, startDate, subjects) => {
-    const doseMcg = doseUnit === 'mg' ? parseFloat(doseAmount) * 1000 : parseFloat(doseAmount);
+    const doseMcg = doseUnit === 'mg' ? safeFloat(doseAmount) * 1000 : safeFloat(doseAmount);
     
     const processedSubjects = (subjects || []).map(s => ({
       ...s,
-      doseMcg: s.doseUnit === 'mg' ? parseFloat(s.doseAmount) * 1000 : parseFloat(s.doseAmount)
+      doseMcg: s.doseUnit === 'mg' ? safeFloat(s.doseAmount) * 1000 : safeFloat(s.doseAmount)
     }));
 
     const updatedVials = vials.map(v => 
       v.id === id ? { 
-        ...v, doseAmount: parseFloat(doseAmount), doseUnit, doseMcg, frequency, timeOfDay, selectedDays, color,
+        ...v, doseAmount: safeFloat(doseAmount), doseUnit, doseMcg, frequency, timeOfDay, selectedDays, color,
         startDate: startDate || v.startDate, 
         inventory: inventory || v.inventory || [],
         subjects: processedSubjects.length > 0 ? processedSubjects : undefined
@@ -137,14 +160,14 @@ export const VialProvider = ({ children }) => {
           newPeptides[0] = { ...newPeptides[0], mg: primaryMg };
         }
 
-        const parsedDoseAmount = parseFloat(newDoseAmount) || vial.doseAmount;
+        const parsedDoseAmount = safeFloat(newDoseAmount) || vial.doseAmount;
         const doseMcg = newDoseUnit === 'mg' ? parsedDoseAmount * 1000 : parsedDoseAmount;
 
         return {
           ...vial,
           inventory: updatedInventory,
           peptides: newPeptides,
-          bacWaterMl: parseFloat(newBacWaterMl) || vial.bacWaterMl,
+          bacWaterMl: safeFloat(newBacWaterMl) || vial.bacWaterMl,
           doseAmount: parsedDoseAmount,
           doseUnit: newDoseUnit || vial.doseUnit,
           doseMcg: doseMcg,
@@ -169,10 +192,11 @@ export const VialProvider = ({ children }) => {
   const deleteVial = (id) => {
     Alert.alert("Permanently Delete", "Are you sure? This cannot be undone.", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => {
+      { text: "Delete", style: "destructive", onPress: async () => {
           const updatedVials = vials.filter(v => v.id !== id);
           setVials(updatedVials);
-          saveVials(updatedVials);
+          await saveVials(updatedVials);
+          await AsyncStorage.removeItem(`@peptide_logs_${id}`);
         }
       }
     ]);
@@ -180,11 +204,11 @@ export const VialProvider = ({ children }) => {
 
   const logInjection = (id, doseAmount, doseUnit, doseMcg, customDate = null, subjectId = null, subjectName = null) => {
     let targetDateObj = new Date();
-    if (customDate) {
-      // Splits "2026-03-21" into raw numbers: [2026, 03, 21]
-      const [year, month, day] = customDate.split('-');
-      // Builds a perfect local date. (JS months are 0-indexed, so we subtract 1)
-      targetDateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (customDate && typeof customDate === 'string' && customDate.includes('-')) {
+      const parts = customDate.split('-');
+      if (parts.length === 3) {
+        targetDateObj = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      }
     }
     
     // Pass the pristine Date object to your formatter
@@ -211,10 +235,18 @@ export const VialProvider = ({ children }) => {
     saveVials(updatedVials);
   };
   
-  // NEW: Completely overwrites the database with imported backup data
   const restoreData = (importedVials) => {
-    setVials(importedVials);
-    saveVials(importedVials);
+    const validated = importedVials.map(vial => ({
+        ...vial,
+        id: vial.id || Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        vialName: vial.vialName || vial.name || "Imported Vial",
+        peptides: Array.isArray(vial.peptides) ? vial.peptides : [],
+        inventory: Array.isArray(vial.inventory) ? vial.inventory : [],
+        logs: Array.isArray(vial.logs) ? vial.logs : [],
+        subjects: Array.isArray(vial.subjects) ? vial.subjects : undefined
+    }));
+    setVials(validated);
+    saveVials(validated);
   };
 
   return (
