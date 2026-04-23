@@ -218,6 +218,13 @@ export default function VialsScreen() {
 
             <View style={{ marginTop: 10, marginBottom: 5, borderTopWidth: 1, borderColor: '#e5e7eb', paddingTop: 10 }}>
               <Text style={styles.label}>Inventory</Text>
+              {editInventory.length > 0 && (
+                <View style={{ flexDirection: 'row', marginBottom: 5, gap: 8, paddingHorizontal: 2 }}>
+                  <Text style={{ flex: 1, fontSize: 12, color: theme === 'dark' ? '#9ca3af' : '#6b7280', fontWeight: '600', paddingLeft: 4 }}>Size (mg)</Text>
+                  <Text style={{ flex: 1, fontSize: 12, color: theme === 'dark' ? '#9ca3af' : '#6b7280', fontWeight: '600', paddingLeft: 4 }}>Quantity</Text>
+                  {editInventory.length > 1 && <View style={{ paddingHorizontal: 10 }}><Text style={{fontWeight: 'bold', color: 'transparent'}}>X</Text></View>}
+                </View>
+              )}
               {editInventory.map((inv) => (
                 <View key={inv.id} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 }}>
                   <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { flex: 1, marginBottom: 0 }]} placeholder="Size (mg)" keyboardType="numeric" value={inv.mg} onChangeText={(val) => updateEditInventory(inv.id, 'mg', val)} />
