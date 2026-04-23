@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Text, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors } from '../../theme';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();

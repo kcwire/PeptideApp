@@ -1,8 +1,8 @@
 import React, { useContext, useMemo, useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VialContext } from '../_context/VialContext';
-import { getStyles } from '../theme';
+import { VialContext } from '../../context/VialContext';
+import { getStyles } from '../../theme';
 
 export default function ScheduleScreen() {
   const theme = useColorScheme() ?? 'light';

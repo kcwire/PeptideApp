@@ -1,10 +1,10 @@
 import React, { useContext, useState } from 'react';
-import DateInput from '../components/DateInput';
-import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
+import DateInput from '../../components/DateInput';
+import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VialContext, safeFloat, safeInt } from '../_context/VialContext';
-import VialCard from '../components/VialCard';
-import { getStyles, vialColors } from '../theme';
+import { VialContext, safeFloat, safeInt } from '../../context/VialContext';
+import VialCard from '../../components/VialCard';
+import { getStyles, vialColors } from '../../theme';
 
 export default function VialsScreen() {
   const theme = useColorScheme() ?? 'light';
@@ -15,7 +15,7 @@ export default function VialsScreen() {
   
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [logModalVisible, setLogModalVisible] = useState(false);
-  const [activeVial, setActiveVial] = useState(null);
+  const [activeVial, setActiveVial] = useState<any>(null);
   
   const [editDose, setEditDose] = useState('');
   const [editUnit, setEditUnit] = useState('mcg');
@@ -79,18 +79,18 @@ export default function VialsScreen() {
   };
 
   const handleAddEditInventoryRow = () => setEditInventory([...editInventory, { id: Date.now().toString(), mg: '', count: '0' }]);
-  const handleRemoveEditInventoryRow = (id) => {
+  const handleRemoveEditInventoryRow = (id: string) => {
     if (editInventory.length === 1) return;
     setEditInventory(editInventory.filter(i => i.id !== id));
   };
-  const updateEditInventory = (id, field, value) => setEditInventory(editInventory.map(i => i.id === id ? { ...i, [field]: value } : i));
+  const updateEditInventory = (id: string, field: string, value: string) => setEditInventory(editInventory.map(i => i.id === id ? { ...i, [field]: value } : i));
 
   const handleAddEditSubject = () => setEditSubjects([...editSubjects, { id: Date.now().toString(), name: '', doseAmount: '', doseUnit: 'mcg' }]);
-  const handleRemoveEditSubject = (id) => {
+  const handleRemoveEditSubject = (id: string) => {
     if (editSubjects.length === 1) return;
     setEditSubjects(editSubjects.filter(s => s.id !== id));
   };
-  const updateEditSubject = (id, field, value) => setEditSubjects(editSubjects.map(s => s.id === id ? { ...s, [field]: value } : s));
+  const updateEditSubject = (id: string, field: string, value: string) => setEditSubjects(editSubjects.map(s => s.id === id ? { ...s, [field]: value } : s));
 
   const openNextVialModal = (vial) => {
     setActiveVial(vial);
@@ -169,7 +169,7 @@ export default function VialsScreen() {
                           </TouchableOpacity>
                         )}
                       </View>
-                      <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { marginBottom: 10 }]} placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} placeholder="Name" value={sub.name} onChangeText={(val) => updateEditSubject(sub.id, 'name', val)} />
+                      <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { marginBottom: 10 }]} placeholder="Name" value={sub.name} onChangeText={(val) => updateEditSubject(sub.id, 'name', val)} />
                       <View style={styles.doseInputRow}>
                         <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={styles.doseAmountInput} placeholder="Target Dose" keyboardType="numeric" value={sub.doseAmount} onChangeText={(val) => updateEditSubject(sub.id, 'doseAmount', val)} />
                         <View style={styles.unitToggleContainer}>

@@ -2,13 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 
-export const VialContext = createContext(null);
+export const VialContext = createContext<any>(null);
 
-export const safeFloat = (val) => { const n = parseFloat(val); return isNaN(n) ? 0 : n; };
-export const safeInt = (val) => { const n = parseInt(val, 10); return isNaN(n) ? 0 : n; };
+export const safeFloat = (val: any) => { const n = parseFloat(val); return isNaN(n) ? 0 : n; };
+export const safeInt = (val: any) => { const n = parseInt(val, 10); return isNaN(n) ? 0 : n; };
 
 // Custom Date Formatter for React Native
-const formatDateTime = (inputDate) => {
+const formatDateTime = (inputDate: Date | null) => {
   const d = inputDate ? new Date(inputDate) : new Date();
   
   if (isNaN(d.getTime())) return inputDate; 
@@ -24,8 +24,8 @@ const formatDateTime = (inputDate) => {
   return `${day}, ${month} ${date}`;
 };
 
-export const VialProvider = ({ children }) => {
-  const [vials, setVials] = useState([]);
+export const VialProvider = ({ children }: any) => {
+  const [vials, setVials] = useState<any[]>([]);
 
   useEffect(() => {
     loadVials();
@@ -35,11 +35,11 @@ export const VialProvider = ({ children }) => {
     try {
       const savedVials = await AsyncStorage.getItem('@peptide_vials');
       if (savedVials !== null) {
-        let parsed = JSON.parse(savedVials);
+        let parsed: any[] = JSON.parse(savedVials);
         
         // Fetch separate logs for vials that don't have them embedded (backward compatibility)
         const keysToFetch = parsed.filter(v => !v.logs).map(v => `@peptide_logs_${v.id}`);
-        let logsMap = {};
+        let logsMap: any = {};
         if (keysToFetch.length > 0) {
            const fetchedLogs = await AsyncStorage.multiGet(keysToFetch);
            fetchedLogs.forEach(([key, value]) => {
@@ -68,10 +68,10 @@ export const VialProvider = ({ children }) => {
     }
   };
 
-  const saveVials = async (updatedVials) => {
+  const saveVials = async (updatedVials: any[]) => {
     try {
       const metadataOnly = updatedVials.map(({logs, ...rest}) => rest);
-      const multiSetPairs = [['@peptide_vials', JSON.stringify(metadataOnly)]];
+      const multiSetPairs: [string, string][] = [['@peptide_vials', JSON.stringify(metadataOnly)]];
       updatedVials.forEach(vial => {
          multiSetPairs.push([`@peptide_logs_${vial.id}`, JSON.stringify(vial.logs || [])]);
       });
@@ -81,14 +81,14 @@ export const VialProvider = ({ children }) => {
     }
   };
 
-  const addVial = (newVial) => {
+  const addVial = (newVial: any) => {
     // Grab today's date in YYYY-MM-DD format
     const todayStr = new Date().toISOString().split('T')[0]; 
     
     const inventory = newVial.inventory || [];
     
     // Process subjects if any
-    const processedSubjects = (newVial.subjects || []).map(s => ({
+    const processedSubjects = (newVial.subjects || []).map((s: any) => ({
       ...s,
       doseMcg: s.doseUnit === 'mg' ? safeFloat(s.doseAmount) * 1000 : safeFloat(s.doseAmount)
     }));
@@ -109,15 +109,15 @@ export const VialProvider = ({ children }) => {
   };
 
   // ADDED color to the end of the arguments!
-  const updateVial = (id, doseAmount, doseUnit, frequency, timeOfDay, selectedDays, inventory, color, startDate, subjects) => {
+  const updateVial = (id: string, doseAmount: any, doseUnit: string, frequency: string, timeOfDay: string, selectedDays: string[], inventory: any[], color: string, startDate: string, subjects: any[]) => {
     const doseMcg = doseUnit === 'mg' ? safeFloat(doseAmount) * 1000 : safeFloat(doseAmount);
     
-    const processedSubjects = (subjects || []).map(s => ({
+    const processedSubjects = (subjects || []).map((s: any) => ({
       ...s,
       doseMcg: s.doseUnit === 'mg' ? safeFloat(s.doseAmount) * 1000 : safeFloat(s.doseAmount)
     }));
 
-    const updatedVials = vials.map(v => 
+    const updatedVials = vials.map((v: any) => 
       v.id === id ? { 
         ...v, doseAmount: safeFloat(doseAmount), doseUnit, doseMcg, frequency, timeOfDay, selectedDays, color,
         startDate: startDate || v.startDate, 
@@ -129,7 +129,7 @@ export const VialProvider = ({ children }) => {
     saveVials(updatedVials);
   };
 
-  const startNextVial = (id, inventoryIndex, newBacWaterMl, newDoseAmount, newDoseUnit) => {
+  const startNextVial = (id: string, inventoryIndex: number, newBacWaterMl: any, newDoseAmount: any, newDoseUnit: string) => {
     // 1. Get a timezone-safe YYYY-MM-DD string for "today"
     const today = new Date();
     const year = today.getFullYear();
@@ -138,7 +138,7 @@ export const VialProvider = ({ children }) => {
     const todayStr = `${year}-${month}-${day}`;
 
     // 2. Update the specific vial's lifecycle data
-    const updatedVials = vials.map(vial => {
+    const updatedVials = vials.map((vial: any) => {
       if (vial.id === id) {
         let updatedInventory = [...(vial.inventory || [])];
         let primaryMg = vial.peptides && vial.peptides.length > 0 ? vial.peptides[0].mg : 0;
@@ -182,18 +182,18 @@ export const VialProvider = ({ children }) => {
     saveVials(updatedVials);
   };
 
-  const toggleArchive = (id) => {
+  const toggleArchive = (id: string) => {
     // We will still use 'isArchived' under the hood, but in the UI we treat it as Active/Inactive
-    const updatedVials = vials.map(v => v.id === id ? { ...v, isArchived: !v.isArchived } : v);
+    const updatedVials = vials.map((v: any) => v.id === id ? { ...v, isArchived: !v.isArchived } : v);
     setVials(updatedVials);
     saveVials(updatedVials);
   };
 
-  const deleteVial = (id) => {
+  const deleteVial = (id: string) => {
     Alert.alert("Permanently Delete", "Are you sure? This cannot be undone.", [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: async () => {
-          const updatedVials = vials.filter(v => v.id !== id);
+          const updatedVials = vials.filter((v: any) => v.id !== id);
           setVials(updatedVials);
           await saveVials(updatedVials);
           await AsyncStorage.removeItem(`@peptide_logs_${id}`);
@@ -202,7 +202,7 @@ export const VialProvider = ({ children }) => {
     ]);
   };
 
-  const logInjection = (id, doseAmount, doseUnit, doseMcg, customDate = null, subjectId = null, subjectName = null) => {
+  const logInjection = (id: string, doseAmount: any, doseUnit: string, doseMcg: number, customDate: string | null = null, subjectId: string | null = null, subjectName: string | null = null) => {
     let targetDateObj = new Date();
     if (customDate && typeof customDate === 'string' && customDate.includes('-')) {
       const parts = customDate.split('-');
@@ -224,18 +224,18 @@ export const VialProvider = ({ children }) => {
       subjectId,
       subjectName
     };
-    const updatedVials = vials.map(v => v.id === id ? { ...v, logs: [newLog, ...v.logs] } : v);
+    const updatedVials = vials.map((v: any) => v.id === id ? { ...v, logs: [newLog, ...v.logs] } : v);
     setVials(updatedVials);
     saveVials(updatedVials);
   };
 
-  const deleteLog = (vialId, logId) => {
-    const updatedVials = vials.map(v => v.id === vialId ? { ...v, logs: v.logs.filter(l => l.id !== logId) } : v);
+  const deleteLog = (vialId: string, logId: string) => {
+    const updatedVials = vials.map((v: any) => v.id === vialId ? { ...v, logs: v.logs.filter((l: any) => l.id !== logId) } : v);
     setVials(updatedVials);
     saveVials(updatedVials);
   };
   
-  const restoreData = (importedVials) => {
+  const restoreData = (importedVials: any[]) => {
     const validated = importedVials.map(vial => ({
         ...vial,
         id: vial.id || Date.now().toString() + Math.random().toString(36).substr(2, 5),

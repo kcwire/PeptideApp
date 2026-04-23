@@ -1,9 +1,9 @@
 import React, { useContext } from 'react';
 import { Alert, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
-import { VialContext } from '../_context/VialContext';
+import { VialContext } from '../context/VialContext';
 import { getStyles } from '../theme';
 
-export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, onEdit, onLogPast, onStartNextVial }) {
+export default function VialCard({ vial, isActive, isExpanded, onToggleExpand, onEdit, onLogPast, onStartNextVial }: any) {
   const theme = useColorScheme() ?? 'light';
   const styles = getStyles(theme);
   const { toggleArchive, deleteVial, logInjection, deleteLog } = useContext(VialContext);

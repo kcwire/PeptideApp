@@ -5,8 +5,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VialContext } from '../_context/VialContext';
-import { colors, getStyles } from '../theme';
+import { VialContext } from '../../context/VialContext';
+import { colors, getStyles } from '../../theme';
 
 export default function SettingsScreen() {
   const { vials, restoreData } = useContext(VialContext);

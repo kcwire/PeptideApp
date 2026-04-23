@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { VialProvider } from './_context/VialContext';
+import { VialProvider } from '../context/VialContext';
 
 export default function RootLayout() {
   return (

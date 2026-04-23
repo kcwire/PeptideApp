@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
-import DateInput from '../components/DateInput';
+import DateInput from '../../components/DateInput';
 import React, { useContext, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VialContext, safeFloat, safeInt } from '../_context/VialContext';
-import { getStyles, vialColors } from '../theme';
+import { VialContext, safeFloat, safeInt } from '../../context/VialContext';
+import { getStyles, vialColors } from '../../theme';
 
 export default function AddScreen() {
   const theme = useColorScheme() ?? 'light';
@@ -32,7 +32,7 @@ export default function AddScreen() {
 
   const [selectedDays, setSelectedDays] = useState(['Mon', 'Thu']);
 
-  const toggleDay = (day) => {
+  const toggleDay = (day: string) => {
     if (selectedDays.includes(day)) setSelectedDays(selectedDays.filter(d => d !== day));
     else setSelectedDays([...selectedDays, day]);
   };
@@ -41,25 +41,25 @@ export default function AddScreen() {
   const timeOptions = ['AM', 'PM', 'Any'];
 
   const handleAddPeptideRow = () => setPeptides([...peptides, { id: Date.now().toString(), name: '', mg: '' }]);
-  const handleRemovePeptideRow = (id) => {
+  const handleRemovePeptideRow = (id: string) => {
     if (peptides.length === 1) return;
     setPeptides(peptides.filter(p => p.id !== id));
   };
-  const updatePeptide = (id, field, value) => setPeptides(peptides.map(p => p.id === id ? { ...p, [field]: value } : p));
+  const updatePeptide = (id: string, field: string, value: string) => setPeptides(peptides.map(p => p.id === id ? { ...p, [field]: value } : p));
 
   const handleAddInventoryRow = () => setInventory([...inventory, { id: Date.now().toString(), mg: '', count: '0' }]);
-  const handleRemoveInventoryRow = (id) => {
+  const handleRemoveInventoryRow = (id: string) => {
     if (inventory.length === 1) return;
     setInventory(inventory.filter(i => i.id !== id));
   };
-  const updateInventory = (id, field, value) => setInventory(inventory.map(i => i.id === id ? { ...i, [field]: value } : i));
+  const updateInventory = (id: string, field: string, value: string) => setInventory(inventory.map(i => i.id === id ? { ...i, [field]: value } : i));
 
   const handleAddSubject = () => setSubjects([...subjects, { id: Date.now().toString(), name: '', doseAmount: '', doseUnit: 'mcg' }]);
-  const handleRemoveSubject = (id) => {
+  const handleRemoveSubject = (id: string) => {
     if (subjects.length === 1) return;
     setSubjects(subjects.filter(s => s.id !== id));
   };
-  const updateSubject = (id, field, value) => setSubjects(subjects.map(s => s.id === id ? { ...s, [field]: value } : s));
+  const updateSubject = (id: string, field: string, value: string) => setSubjects(subjects.map(s => s.id === id ? { ...s, [field]: value } : s));
 
 
   const handleAdd = () => {
