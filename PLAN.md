@@ -167,13 +167,13 @@ export interface ProtocolSupplyResult {
 - [x] **TASK-105**: Multi-Day Persistence & Dynamic Date Titration Engine (`utils/protocolMath.ts`, `app/(tabs)/index.tsx`)
 - [x] **TASK-106**: Full V2 Database Backup & Restore Engine (`app/(tabs)/settings.tsx`, `context/ProtocolContext.tsx`)
 
-### Phase 2: Feature Enhancements & Inventory Redesign (In Progress)
-- [ ] **TASK-201**: Update Expiration Warning Threshold to 45 Days (`utils/protocolMath.ts`)
-- [ ] **TASK-202**: Protocol Duplication & Single-Protocol Sharing / Import (`context/ProtocolContext.tsx`, `app/(tabs)/protocol.tsx`)
-- [ ] **TASK-203**: Smart Inventory Deduction Prompt on Protocol Activation (`context/ProtocolContext.tsx`)
-- [ ] **TASK-204**: Per-Protocol Progress Cards & Escalation Banners (`components/ProtocolProgressBanner.tsx`, `app/(tabs)/index.tsx`)
-- [ ] **TASK-205**: Vials Tab Architecture Redesign as Physical Inventory Manager (`app/(tabs)/vials.tsx`)
-- [ ] **TASK-206**: End-to-End Verification & Automated Test Suite Execution
+### Phase 2: Feature Enhancements & Inventory Redesign (Completed)
+- [x] **TASK-201**: Update Expiration Warning Threshold to 45 Days (`utils/protocolMath.ts`, `components/ProtocolSupplySummary.tsx`)
+- [x] **TASK-202**: Protocol Duplication & Single-Protocol Sharing / Import (`context/ProtocolContext.tsx`, `app/(tabs)/protocol.tsx`)
+- [x] **TASK-203**: Smart Inventory Deduction Prompt on Protocol Activation (`context/ProtocolContext.tsx`)
+- [x] **TASK-204**: Per-Protocol Progress Cards & Escalation Banners (`components/ProtocolProgressBanner.tsx`, `app/(tabs)/index.tsx`)
+- [x] **TASK-205**: Vials Tab Architecture Redesign as Physical Inventory Manager (`app/(tabs)/vials.tsx`)
+- [x] **TASK-206**: End-to-End Verification & Automated Test Suite Execution
 
 ---
 

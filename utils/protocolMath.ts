@@ -96,7 +96,7 @@ export const calculateProtocolSupplies = (config: ProtocolConfig): ProtocolSuppl
     const avgDailyMgConsumption = totalPeptideMgRequired / (totalDurationWeeks * 7);
     if (avgDailyMgConsumption > 0) {
       const daysPerVial = vialMg / avgDailyMgConsumption;
-      if (daysPerVial > 28) {
+      if (daysPerVial > 45) {
         vialExpirationWarning = true;
       }
     }

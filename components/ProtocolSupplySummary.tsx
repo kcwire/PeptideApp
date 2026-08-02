@@ -79,7 +79,7 @@ export default function ProtocolSupplySummary({ supplies }: Props) {
             ⚠️ Reconstitution Shelf-Life Warning
           </Text>
           <Text style={{ color: c.warningTextSub, fontSize: 12, marginTop: 2 }}>
-            Based on current low titration dosage, a single reconstituted vial may last longer than 28–30 days. Consider using smaller vial sizes to preserve peptide stability.
+            Based on current low titration dosage, a single reconstituted vial may last longer than 45 days. Consider using smaller vial sizes to preserve peptide stability.
           </Text>
         </View>
       )}

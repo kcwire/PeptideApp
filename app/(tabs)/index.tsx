@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { VialContext } from '../../context/VialContext';
 import { getStyles } from '../../theme';
 import { getProtocolPhaseForDate } from '../../utils/protocolMath';
+import ProtocolProgressBanner from '../../components/ProtocolProgressBanner';
 
 export default function ScheduleScreen() {
   const theme = useColorScheme() ?? 'light';
@@ -81,6 +82,11 @@ export default function ScheduleScreen() {
   const amVials = scheduledVials.filter(v => v.timeOfDay === 'AM');
   const pmVials = scheduledVials.filter(v => v.timeOfDay === 'PM');
   const anyVials = scheduledVials.filter(v => !v.timeOfDay || v.timeOfDay === 'Any');
+
+  // Filter active protocol vials to render progress cards
+  const protocolVialsForDate = useMemo(() => {
+    return scheduledVials.filter(v => Array.isArray(v.protocolPhases) && v.protocolPhases.length > 0);
+  }, [scheduledVials]);
 
   const handleQuickLog = (vial: any, subject: any = null) => {
     const phaseInfo = getProtocolPhaseForDate(vial, selectedDate);
@@ -260,6 +266,11 @@ export default function ScheduleScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.dashHeader}>{isSelectedToday ? "Today's Schedule" : selectedDateString}</Text>
         <Text style={styles.dashSub}>{isFutureDate ? "Upcoming Injections" : isSelectedToday ? "Don't forget to log!" : "Past Injections"}</Text>
+
+        {/* PER-PROTOCOL PROGRESS BANNERS */}
+        {protocolVialsForDate.map((vial: any) => (
+          <ProtocolProgressBanner key={vial.id} vial={vial} targetDate={selectedDate} />
+        ))}
 
         {scheduledVials.length === 0 ? <Text style={styles.emptyText}>No injections scheduled for this date. 🎉</Text> : (
           <>

@@ -1,59 +1,76 @@
-import React, { useContext, useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, useColorScheme, Alert } from 'react-native';
+import React, { useContext, useState } from 'react';
+import {
+  Alert,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useColorScheme,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { ProtocolContext } from '../../context/ProtocolContext';
 import { getStyles, colors } from '../../theme';
-import TitrationPhaseBuilder from '../../components/TitrationPhaseBuilder';
-import ProtocolSupplySummary from '../../components/ProtocolSupplySummary';
 import { ProtocolConfig, TitrationPhase } from '../../types/protocol';
+import ProtocolSupplySummary from '../../components/ProtocolSupplySummary';
+import TitrationPhaseBuilder from '../../components/TitrationPhaseBuilder';
+import { safeFloat, safeInt } from '../../context/VialContext';
 import { calculateProtocolSupplies } from '../../utils/protocolMath';
-import { safeFloat } from '../../context/VialContext';
 
-export default function ProtocolScreen() {
+export default function ProtocolPlannerScreen() {
   const theme = useColorScheme() ?? 'light';
   const styles = getStyles(theme);
   const c = colors[theme];
 
-  const { protocols, saveProtocol, deleteProtocol, convertProtocolToVials } = useContext(ProtocolContext) || {};
+  const { protocols, saveProtocol, duplicateProtocol, deleteProtocol, convertProtocolToVials } = useContext(ProtocolContext);
 
+  // Modal State
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProtocolId, setEditingProtocolId] = useState<string | null>(null);
 
+  // Form State
   const [protocolName, setProtocolName] = useState('');
   const [notes, setNotes] = useState('');
   const [vialMg, setVialMg] = useState('10');
   const [bacWaterMl, setBacWaterMl] = useState('2');
   const [wasteBufferPercent, setWasteBufferPercent] = useState('10');
 
+  // Phases List State
   const [phases, setPhases] = useState<TitrationPhase[]>([
-    { id: '1', phaseName: 'Phase 1 Ramp-Up', durationWeeks: 4, doseAmount: 2.5, doseUnit: 'mg', frequency: 'Specific Days', selectedDays: ['Mon'], injectionsPerWeek: 1 },
-    { id: '2', phaseName: 'Phase 2 Step-Up', durationWeeks: 4, doseAmount: 5.0, doseUnit: 'mg', frequency: 'Specific Days', selectedDays: ['Mon'], injectionsPerWeek: 1 },
-    { id: '3', phaseName: 'Phase 3 Target Maintenance', durationWeeks: 4, doseAmount: 7.5, doseUnit: 'mg', frequency: 'Specific Days', selectedDays: ['Mon'], injectionsPerWeek: 1 },
+    {
+      id: 'phase_init',
+      phaseName: 'Phase 1: Initiation',
+      durationWeeks: 4,
+      doseAmount: 2.5,
+      doseUnit: 'mg',
+      frequency: 'Specific Days',
+      selectedDays: ['Mon'],
+      injectionsPerWeek: 1,
+    },
   ]);
 
-  const draftConfig: ProtocolConfig = useMemo(() => {
-    return {
-      id: editingProtocolId || 'draft',
-      name: protocolName || 'New Peptide Protocol',
-      notes,
-      phases,
-      reconstitution: {
-        vialMg: safeFloat(vialMg),
-        bacWaterMl: safeFloat(bacWaterMl),
-        syringeCapacityUnits: 100,
-        wasteBufferPercent: safeFloat(wasteBufferPercent),
-      },
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-  }, [editingProtocolId, protocolName, notes, phases, vialMg, bacWaterMl, wasteBufferPercent]);
-
-  const draftSupplies = useMemo(() => {
-    return calculateProtocolSupplies(draftConfig);
-  }, [draftConfig]);
-
   const openCreateModal = () => {
-    resetForm();
     setEditingProtocolId(null);
+    setProtocolName('');
+    setNotes('');
+    setVialMg('10');
+    setBacWaterMl('2');
+    setWasteBufferPercent('10');
+    setPhases([
+      {
+        id: 'phase_init',
+        phaseName: 'Phase 1: Initiation',
+        durationWeeks: 4,
+        doseAmount: 2.5,
+        doseUnit: 'mg',
+        frequency: 'Specific Days',
+        selectedDays: ['Mon'],
+        injectionsPerWeek: 1,
+      },
+    ]);
     setModalVisible(true);
   };
 
@@ -68,55 +85,82 @@ export default function ProtocolScreen() {
     setModalVisible(true);
   };
 
+  const handleShareProtocol = async (protocol: ProtocolConfig) => {
+    try {
+      const payloadStr = JSON.stringify(protocol, null, 2);
+      const cleanName = (protocol.name || 'Protocol').replace(/[^a-zA-Z0-9]/g, '_');
+      const file = new File(Paths.cache, `${cleanName}_Protocol.json`);
+      if (!file.exists) file.create();
+      file.write(payloadStr);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, {
+          mimeType: 'application/json',
+          dialogTitle: `Share Protocol Template: ${protocol.name}`
+        });
+      } else {
+        Alert.alert('Protocol Template Shared', payloadStr);
+      }
+    } catch (err: any) {
+      Alert.alert('Share Failed', err?.message || 'Could not share protocol template.');
+    }
+  };
+
   const handleSave = () => {
     if (!protocolName.trim()) {
-      Alert.alert('Protocol Name Required', 'Please provide a descriptive name for your protocol (e.g. Tirzepatide 12-Week Plan).');
+      Alert.alert('Missing Name', 'Please enter a name for this peptide protocol.');
       return;
     }
-    if (safeFloat(vialMg) <= 0 || safeFloat(bacWaterMl) <= 0) {
-      Alert.alert('Reconstitution Setup Required', 'Please specify valid vial mg and BAC water mL values.');
+    if (phases.length === 0) {
+      Alert.alert('Missing Phases', 'Please add at least one titration phase.');
       return;
     }
 
-    saveProtocol(draftConfig);
+    const payload: Partial<ProtocolConfig> = {
+      id: editingProtocolId || undefined,
+      name: protocolName.trim(),
+      notes: notes.trim(),
+      phases,
+      reconstitution: {
+        vialMg: safeFloat(vialMg),
+        bacWaterMl: safeFloat(bacWaterMl),
+        syringeCapacityUnits: 100,
+        wasteBufferPercent: safeFloat(wasteBufferPercent),
+      },
+    };
+
+    saveProtocol(payload);
     setModalVisible(false);
-    resetForm();
   };
 
-  const resetForm = () => {
-    setEditingProtocolId(null);
-    setProtocolName('');
-    setNotes('');
-    setVialMg('10');
-    setBacWaterMl('2');
-    setWasteBufferPercent('10');
-    setPhases([
-      { id: '1', phaseName: 'Phase 1 Ramp-Up', durationWeeks: 4, doseAmount: 2.5, doseUnit: 'mg', frequency: 'Specific Days', selectedDays: ['Mon'], injectionsPerWeek: 1 },
-      { id: '2', phaseName: 'Phase 2 Step-Up', durationWeeks: 4, doseAmount: 5.0, doseUnit: 'mg', frequency: 'Specific Days', selectedDays: ['Mon'], injectionsPerWeek: 1 },
-    ]);
+  // Preview real-time calculation inside modal
+  const previewProtocol: ProtocolConfig = {
+    id: 'preview',
+    name: protocolName || 'Preview Plan',
+    phases,
+    reconstitution: {
+      vialMg: safeFloat(vialMg),
+      bacWaterMl: safeFloat(bacWaterMl),
+      syringeCapacityUnits: 100,
+      wasteBufferPercent: safeFloat(wasteBufferPercent),
+    },
+    createdAt: new Date().toISOString(),
   };
+  const previewSupplies = calculateProtocolSupplies(previewProtocol);
 
   return (
-    <SafeAreaView style={[styles.container, { paddingHorizontal: 16 }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 16 }}>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
           <View>
-            <Text style={{ fontSize: 22, fontWeight: 'bold', color: c.textMain }}>Peptide Protocol Planner 📋</Text>
-            <Text style={{ color: c.textSub, fontSize: 13, marginTop: 2 }}>
-              Design titration cycles & calculate required vials, BAC water, & syringes.
-            </Text>
+            <Text style={styles.dashHeader}>Protocol Planner 📋</Text>
+            <Text style={styles.dashSub}>Design titration schedules & supply needs.</Text>
           </View>
-        </View>
 
-        {/* Create Protocol Button */}
-        <TouchableOpacity
-          onPress={openCreateModal}
-          style={[styles.primaryButton, { marginBottom: 20, marginTop: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }]}
-        >
-          <Text style={{ fontSize: 18 }}>➕</Text>
-          <Text style={styles.buttonText}>Create New Protocol Plan</Text>
-        </TouchableOpacity>
+          <TouchableOpacity onPress={openCreateModal} style={styles.primaryButton}>
+            <Text style={styles.buttonText}>+ New Plan</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* List of Saved Protocols */}
         <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Saved Protocol Plans ({protocols?.length || 0})</Text>
@@ -126,7 +170,7 @@ export default function ProtocolScreen() {
             <Text style={{ fontSize: 32, marginBottom: 8 }}>🧪</Text>
             <Text style={{ fontWeight: '700', color: c.textMain, fontSize: 16, textAlign: 'center' }}>No Protocol Plans Created</Text>
             <Text style={{ color: c.textSub, fontSize: 13, textAlign: 'center', marginTop: 4 }}>
-              Tap "Create New Protocol Plan" to define titration ramp-ups and calculate your total peptide, water, and syringe supply needs.
+              Tap "+ New Plan" to define titration ramp-ups and calculate your total peptide, water, and syringe supply needs.
             </Text>
           </View>
         ) : (
@@ -140,7 +184,13 @@ export default function ProtocolScreen() {
                     {protocol.notes ? <Text style={{ color: c.textSub, fontSize: 12, marginTop: 2 }}>{protocol.notes}</Text> : null}
                   </View>
 
-                  <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                    <TouchableOpacity onPress={() => duplicateProtocol(protocol.id)}>
+                      <Text style={{ color: c.primary, fontWeight: '700', fontSize: 13 }}>Duplicate 📑</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleShareProtocol(protocol)}>
+                      <Text style={{ color: c.primary, fontWeight: '700', fontSize: 13 }}>Share 📤</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={() => openEditModal(protocol)}>
                       <Text style={{ color: c.primary, fontWeight: '700', fontSize: 13 }}>Edit ✏️</Text>
                     </TouchableOpacity>
@@ -174,45 +224,48 @@ export default function ProtocolScreen() {
         )}
       </ScrollView>
 
-      {/* Protocol Creator & Editor Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: c.textMain }}>
-                  {editingProtocolId ? 'Edit Protocol Plan ✏️' : 'New Peptide Protocol Plan'}
-                </Text>
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <Text style={{ fontSize: 18, color: c.textSub, fontWeight: '700' }}>✕</Text>
-                </TouchableOpacity>
-              </View>
+      {/* CREATE / EDIT PROTOCOL MODAL */}
+      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={[styles.container, { paddingHorizontal: 16, paddingTop: 16 }]}>
+          <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: c.textMain }}>
+                {editingProtocolId ? 'Edit Protocol Plan' : 'Create Protocol Plan'}
+              </Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: c.textSub }}>Close ✕</Text>
+              </TouchableOpacity>
+            </View>
 
-              {/* Protocol Name */}
-              <Text style={{ fontSize: 13, fontWeight: '700', color: c.textMain, marginBottom: 4 }}>Protocol Name</Text>
+            {/* Protocol Meta */}
+            <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 16 }}>
+              <Text style={{ fontWeight: '700', color: c.textMain, marginBottom: 4 }}>Protocol Name</Text>
               <TextInput
                 style={[styles.input, { marginBottom: 12 }]}
-                placeholder="e.g. Tirzepatide 12-Week Titration Cycle"
+                placeholder="e.g. Retatrutide Phase 3 Escalation"
                 placeholderTextColor={c.textMuted}
                 value={protocolName}
                 onChangeText={setProtocolName}
               />
 
-              {/* Notes */}
-              <Text style={{ fontSize: 13, fontWeight: '700', color: c.textMain, marginBottom: 4 }}>Protocol Notes (Optional)</Text>
+              <Text style={{ fontWeight: '700', color: c.textMain, marginBottom: 4 }}>Notes / Description</Text>
               <TextInput
-                style={[styles.input, { marginBottom: 16 }]}
-                placeholder="Target goals, subject info, notes..."
+                style={[styles.input, { height: 60 }]}
+                placeholder="e.g. 24-Week study escalation protocol"
                 placeholderTextColor={c.textMuted}
+                multiline
                 value={notes}
                 onChangeText={setNotes}
               />
+            </View>
 
-              {/* Reconstitution & Supply Specs */}
-              <Text style={[styles.sectionTitle, { fontSize: 15, marginBottom: 8 }]}>🧪 Compounding & Reconstitution Spec</Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+            {/* Reconstitution Specs */}
+            <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 16 }}>
+              <Text style={{ fontWeight: '700', color: c.textMain, fontSize: 15, marginBottom: 12 }}>💧 Reconstitution Specifications</Text>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 12, color: c.textSub, marginBottom: 4 }}>Vial Size (mg)</Text>
+                  <Text style={{ fontSize: 12, color: c.textSub, marginBottom: 4 }}>Vial Mass (mg)</Text>
                   <TextInput
                     style={styles.input}
                     keyboardType="numeric"
@@ -247,46 +300,22 @@ export default function ProtocolScreen() {
                   />
                 </View>
               </View>
+            </View>
 
-              {/* Titration Phase Builder */}
-              <TitrationPhaseBuilder phases={phases} onChangePhases={setPhases} />
+            {/* Titration Phases Builder */}
+            <TitrationPhaseBuilder phases={phases} onChangePhases={setPhases} />
 
-              {/* Live Calculation Preview */}
-              <ProtocolSupplySummary supplies={draftSupplies} />
+            {/* Live Supply Summary Preview */}
+            <ProtocolSupplySummary supplies={previewSupplies} />
 
-              {/* Action Buttons */}
-              <View style={{ flexDirection: 'row', gap: 12, marginTop: 16, marginBottom: 10 }}>
-                <TouchableOpacity
-                  onPress={() => setModalVisible(false)}
-                  style={{
-                    backgroundColor: c.dayPickerInactive,
-                    paddingVertical: 12,
-                    borderRadius: 8,
-                    alignItems: 'center',
-                    flex: 1,
-                  }}
-                >
-                  <Text style={{ color: c.textMain, fontWeight: '700' }}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleSave}
-                  style={{
-                    backgroundColor: c.primary,
-                    paddingVertical: 12,
-                    borderRadius: 8,
-                    alignItems: 'center',
-                    flex: 2,
-                  }}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '800' }}>
-                    {editingProtocolId ? 'Update Protocol Plan' : 'Save Protocol Plan'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
+            {/* Save Button */}
+            <TouchableOpacity onPress={handleSave} style={[styles.primaryButton, { paddingVertical: 14, marginTop: 12 }]}>
+              <Text style={[styles.buttonText, { fontSize: 16 }]}>
+                {editingProtocolId ? 'Update Protocol Plan' : 'Save Protocol Plan'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );

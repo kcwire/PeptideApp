@@ -11,7 +11,7 @@ const STORAGE_KEY = '@peptide_protocols';
 
 export const ProtocolProvider = ({ children }: { children: React.ReactNode }) => {
   const [protocols, setProtocols] = useState<ProtocolConfig[]>([]);
-  const { addVial } = useContext(VialContext) || {};
+  const { vials, addVial } = useContext(VialContext) || {};
 
   useEffect(() => {
     loadProtocols();
@@ -72,6 +72,26 @@ export const ProtocolProvider = ({ children }: { children: React.ReactNode }) =>
     return formatted;
   };
 
+  const duplicateProtocol = (id: string) => {
+    const target = protocols.find(p => p.id === id);
+    if (!target) return;
+    const duplicated: ProtocolConfig = {
+      ...target,
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 6),
+      name: `${target.name} (Copy)`,
+      createdAt: new Date().toISOString().split('T')[0],
+      phases: target.phases.map((p, idx) => ({
+        ...p,
+        id: `phase_${idx}_${Date.now()}_${Math.random().toString(36).substring(2, 4)}`,
+      })),
+    };
+    const updated = [duplicated, ...protocols];
+    setProtocols(updated);
+    persistProtocols(updated);
+    Alert.alert('Protocol Duplicated 📑', `Created template copy "${duplicated.name}".`);
+    return duplicated;
+  };
+
   const deleteProtocol = (id: string) => {
     Alert.alert('Delete Protocol', 'Are you sure you want to delete this protocol plan?', [
       { text: 'Cancel', style: 'cancel' },
@@ -107,6 +127,7 @@ export const ProtocolProvider = ({ children }: { children: React.ReactNode }) =>
 
   /**
    * Converts a Protocol Plan into an active tracked Vial on the Dashboard & Protocols screen.
+   * Prompts user with Smart Inventory Deduction checking existing unopened stock of matching mg.
    */
   const convertProtocolToVials = (protocol: ProtocolConfig, startDateStr?: string) => {
     if (!addVial) {
@@ -119,31 +140,59 @@ export const ProtocolProvider = ({ children }: { children: React.ReactNode }) =>
     const todayStr = startDateStr || new Date().toISOString().split('T')[0];
 
     const vialMg = protocol.reconstitution.vialMg;
-    const extraVialCount = Math.max(0, supplies.vialsRequired - 1);
+    const totalRequiredVials = supplies.vialsRequired;
 
-    const activeVialPayload = {
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
-      vialName: protocol.name,
-      notes: `Active Titration Protocol (${supplies.totalDurationWeeks} Weeks total)`,
-      protocolId: protocol.id,
-      peptides: [{ name: protocol.name, mg: vialMg }],
-      bacWaterMl: protocol.reconstitution.bacWaterMl,
-      doseAmount: initialPhase.doseAmount,
-      doseUnit: initialPhase.doseUnit,
-      frequency: initialPhase.frequency,
-      selectedDays: initialPhase.selectedDays || ['Mon'],
-      timeOfDay: 'Any',
-      startDate: todayStr,
-      dateReconstituted: todayStr,
-      color: '#3b82f6',
-      inventory: extraVialCount > 0 ? [{ mg: vialMg, count: extraVialCount }] : [],
-      logs: [],
-      protocolPhases: protocol.phases,
-      protocolSupplies: supplies,
+    // TASK-203: Smart Inventory Deduction - Query current unopened stock matching vialMg
+    let unopenedInStock = 0;
+    (vials || []).forEach((v: any) => {
+      (v.inventory || []).forEach((inv: any) => {
+        if (safeFloat(inv.mg) === safeFloat(vialMg)) {
+          unopenedInStock += safeInt(inv.count);
+        }
+      });
+    });
+
+    const netExtraVialsNeeded = Math.max(0, totalRequiredVials - unopenedInStock - 1);
+
+    const executeActivation = (inventoryToAdd: number) => {
+      const activeVialPayload = {
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+        vialName: protocol.name,
+        notes: `Active Titration Protocol (${supplies.totalDurationWeeks} Weeks total)`,
+        protocolId: protocol.id,
+        peptides: [{ name: protocol.name, mg: vialMg }],
+        bacWaterMl: protocol.reconstitution.bacWaterMl,
+        doseAmount: initialPhase.doseAmount,
+        doseUnit: initialPhase.doseUnit,
+        frequency: initialPhase.frequency,
+        selectedDays: initialPhase.selectedDays || ['Mon'],
+        timeOfDay: 'Any',
+        startDate: todayStr,
+        dateReconstituted: todayStr,
+        color: '#3b82f6',
+        inventory: inventoryToAdd > 0 ? [{ mg: vialMg, count: inventoryToAdd }] : [],
+        logs: [],
+        protocolPhases: protocol.phases,
+        protocolSupplies: supplies,
+      };
+
+      addVial(activeVialPayload);
+      Alert.alert('Protocol Activated! 🚀', `Successfully created active tracking for "${protocol.name}". 1 Vial reconstituted today. ${inventoryToAdd} additional unopened vial(s) added to stock.`);
     };
 
-    addVial(activeVialPayload);
-    Alert.alert('Protocol Activated! 🚀', `Successfully created active tracking for "${protocol.name}". Required Vials (${supplies.vialsRequired}) and Syringes (${supplies.totalSyringesRequired}) added to active plan.`);
+    if (unopenedInStock > 0) {
+      Alert.alert(
+        '📦 Smart Inventory Deduction',
+        `This protocol requires ${totalRequiredVials} total vial(s).\n\nYou currently have ${unopenedInStock} unopened vial(s) of ${vialMg}mg in stock.\n\nWould you like to subtract your existing stock?`,
+        [
+          { text: 'Use Inventory (Add ' + netExtraVialsNeeded + ' Extra)', onPress: () => executeActivation(netExtraVialsNeeded) },
+          { text: 'Add All ' + Math.max(0, totalRequiredVials - 1) + ' Fresh Vials', onPress: () => executeActivation(Math.max(0, totalRequiredVials - 1)) },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    } else {
+      executeActivation(Math.max(0, totalRequiredVials - 1));
+    }
   };
 
   return (
@@ -151,6 +200,7 @@ export const ProtocolProvider = ({ children }: { children: React.ReactNode }) =>
       value={{
         protocols,
         saveProtocol,
+        duplicateProtocol,
         deleteProtocol,
         toggleArchiveProtocol,
         convertProtocolToVials,

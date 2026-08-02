@@ -5,11 +5,12 @@ import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View, useC
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VialContext, safeFloat, safeInt } from '../../context/VialContext';
 import VialCard from '../../components/VialCard';
-import { getStyles, vialColors } from '../../theme';
+import { getStyles, vialColors, colors } from '../../theme';
 
 export default function VialsScreen() {
   const theme = useColorScheme() ?? 'light';
   const styles = getStyles(theme);
+  const c = colors[theme];
   const [editColor, setEditColor] = useState(vialColors[0]);
 
   const { vials, updateVial, logInjection, startNextVial } = useContext(VialContext);
@@ -32,6 +33,12 @@ export default function VialsScreen() {
   const [nextVialDoseAmount, setNextVialDoseAmount] = useState('');
   const [nextVialDoseUnit, setNextVialDoseUnit] = useState('mcg');
 
+  // Quick Add Stock Modal State
+  const [stockModalVisible, setStockModalVisible] = useState(false);
+  const [stockVialId, setStockVialId] = useState<string | null>(null);
+  const [addStockMg, setAddStockMg] = useState('10');
+  const [addStockCount, setAddStockCount] = useState('1');
+
   const timeOptions = ['AM', 'PM', 'Any'];
   
   // Date Picker State for Logs
@@ -42,18 +49,14 @@ export default function VialsScreen() {
 
   const [editStartDate, setEditStartDate] = useState('');
   
-  const [expandedLogs, setExpandedLogs] = useState({});
+  const [expandedLogs, setExpandedLogs] = useState<Record<string, boolean>>({});
   const frequencyOptions = ['Daily', 'Mon-Fri', 'Specific Days'];
 
   const [selectedDays, setSelectedDays] = useState(['Mon', 'Thu']);
 
-  const toggleDay = (day) => {
-    if (selectedDays.includes(day)) setSelectedDays(selectedDays.filter(d => d !== day));
-    else setSelectedDays([...selectedDays, day]);
-  };
-  const toggleExpandLog = (vialId) => setExpandedLogs(prev => ({ ...prev, [vialId]: !prev[vialId] }));
+  const toggleExpandLog = (vialId: string) => setExpandedLogs(prev => ({ ...prev, [vialId]: !prev[vialId] }));
 
-  const openEditModal = (vial) => {
+  const openEditModal = (vial: any) => {
     setActiveVial(vial);
     setEditDose((vial.doseAmount || vial.doseMcg).toString());
     setEditUnit(vial.doseUnit || 'mcg');
@@ -63,14 +66,14 @@ export default function VialsScreen() {
     
     if (vial.subjects && vial.subjects.length > 0) {
       setEditIsMultiSubject(true);
-      setEditSubjects(vial.subjects.map(s => ({ ...s, doseAmount: s.doseAmount.toString() })));
+      setEditSubjects(vial.subjects.map((s: any) => ({ ...s, doseAmount: s.doseAmount.toString() })));
     } else {
       setEditIsMultiSubject(false);
       setEditSubjects([{ id: '1', name: '', doseAmount: '', doseUnit: 'mcg' }]);
     }
     
     if (vial.inventory && vial.inventory.length > 0) {
-      setEditInventory(vial.inventory.map((i, idx) => ({ id: idx.toString(), mg: i.mg.toString(), count: i.count.toString() })));
+      setEditInventory(vial.inventory.map((i: any, idx: number) => ({ id: idx.toString(), mg: i.mg.toString(), count: i.count.toString() })));
     } else {
       setEditInventory([{ id: '1', mg: '', count: '0' }]);
     }
@@ -93,9 +96,9 @@ export default function VialsScreen() {
   };
   const updateEditSubject = (id: string, field: string, value: string) => setEditSubjects(editSubjects.map(s => s.id === id ? { ...s, [field]: value } : s));
 
-  const openNextVialModal = (vial) => {
+  const openNextVialModal = (vial: any) => {
     setActiveVial(vial);
-    const defaultIndex = vial.inventory ? vial.inventory.findIndex(i => i.count > 0) : -1;
+    const defaultIndex = vial.inventory ? vial.inventory.findIndex((i: any) => i.count > 0) : -1;
     setNextVialInventoryIndex(defaultIndex);
     setNextVialBacWaterMl(vial.bacWaterMl ? vial.bacWaterMl.toString() : '');
     setNextVialDoseAmount(vial.doseAmount ? vial.doseAmount.toString() : '');
@@ -103,7 +106,7 @@ export default function VialsScreen() {
     setNextVialModalVisible(true);
   };
 
-  const openLogPastModal = (vial) => {
+  const openLogPastModal = (vial: any) => {
     setActiveVial(vial);
     setPastDateInput(new Date().toISOString().split('T')[0]); 
     setPastLogSubjectId('');
@@ -112,14 +115,123 @@ export default function VialsScreen() {
     setLogModalVisible(true);
   };
 
+  const handleQuickAddStock = (vial: any) => {
+    setStockVialId(vial.id);
+    setActiveVial(vial);
+    const existingMg = vial.peptides?.[0]?.mg || vial.inventory?.[0]?.mg || 10;
+    setAddStockMg(existingMg.toString());
+    setAddStockCount('1');
+    setStockModalVisible(true);
+  };
 
-  const activeVialsList = vials.filter(v => !v.isArchived);
+  const saveQuickAddStock = () => {
+    if (!activeVial) return;
+    const mg = safeFloat(addStockMg) || 10;
+    const countToAdd = safeInt(addStockCount) || 1;
+
+    let updatedInventory = [...(activeVial.inventory || [])];
+    const existingIdx = updatedInventory.findIndex((i: any) => safeFloat(i.mg) === mg);
+    
+    if (existingIdx >= 0) {
+      updatedInventory[existingIdx] = {
+        ...updatedInventory[existingIdx],
+        count: safeInt(updatedInventory[existingIdx].count) + countToAdd,
+      };
+    } else {
+      updatedInventory.push({ mg, count: countToAdd });
+    }
+
+    updateVial(
+      activeVial.id,
+      activeVial.doseAmount,
+      activeVial.doseUnit,
+      activeVial.frequency,
+      activeVial.timeOfDay,
+      activeVial.selectedDays,
+      updatedInventory,
+      activeVial.color,
+      activeVial.startDate,
+      activeVial.subjects
+    );
+    setStockModalVisible(false);
+    Alert.alert('Inventory Added 📦', `Added ${countToAdd} unopened vial(s) of ${mg}mg to ${activeVial.vialName || activeVial.name}.`);
+  };
+
+  const activeVialsList = vials.filter((v: any) => !v.isArchived);
+
+  // Compute Inventory Totals
+  const totalUnopenedStockCount = activeVialsList.reduce((sum: number, v: any) => {
+    return sum + (v.inventory || []).reduce((invSum: number, i: any) => invSum + safeInt(i.count), 0);
+  }, 0);
+
+  const completedVialsCount = vials.reduce((sum: number, v: any) => sum + (safeInt(v.completedVials) || 0), 0);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {activeVialsList.length === 0 ? <Text style={styles.emptyText}>No active vials. Add one from the tabs below.</Text> : 
-          activeVialsList.map(vial => (
+        {/* PHYSICAL INVENTORY HEADER */}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={styles.dashHeader}>Physical Inventory & Stock 📦</Text>
+          <Text style={styles.dashSub}>Manage unopened stock, reconstituted bottles, and supplies.</Text>
+        </View>
+
+        {/* METRICS SUMMARY CARDS */}
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+          <View style={{ flex: 1, backgroundColor: c.card, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: c.border, alignItems: 'center' }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: c.primary }}>{totalUnopenedStockCount}</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: c.textSub, marginTop: 2, textTransform: 'uppercase' }}>Unopened Stock</Text>
+          </View>
+
+          <View style={{ flex: 1, backgroundColor: c.card, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: c.border, alignItems: 'center' }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: c.textMain }}>{activeVialsList.length}</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: c.textSub, marginTop: 2, textTransform: 'uppercase' }}>Mixed Bottles</Text>
+          </View>
+
+          <View style={{ flex: 1, backgroundColor: c.card, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: c.border, alignItems: 'center' }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: c.textSub }}>{completedVialsCount}</Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: c.textSub, marginTop: 2, textTransform: 'uppercase' }}>Completed</Text>
+          </View>
+        </View>
+
+        {/* UNOPENED STOCK MANAGEMENT HUB */}
+        <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 20 }}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: c.textMain, marginBottom: 10 }}>📦 Unopened Vial Stock</Text>
+
+          {activeVialsList.length === 0 ? (
+            <Text style={{ color: c.textSub, fontStyle: 'italic', fontSize: 13 }}>No stock items found.</Text>
+          ) : (
+            activeVialsList.map((vial: any) => {
+              const invCount = (vial.inventory || []).reduce((sum: number, i: any) => sum + safeInt(i.count), 0);
+              return (
+                <View key={vial.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.border }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontWeight: '700', color: c.textMain, fontSize: 14 }}>{vial.vialName || vial.name}</Text>
+                    <Text style={{ fontSize: 12, color: c.textSub, marginTop: 2 }}>
+                      {invCount > 0 ? `📦 ${invCount} Unopened Vial(s) in Stock` : '⚠️ Out of Stock'}
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <TouchableOpacity onPress={() => handleQuickAddStock(vial)} style={{ backgroundColor: c.primaryBg, borderColor: c.primary, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
+                      <Text style={{ color: c.primary, fontWeight: '700', fontSize: 12 }}>+ Add Stock</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => openEditModal(vial)}>
+                      <Text style={{ color: c.textSub, fontWeight: '600', fontSize: 12 }}>Edit ✏️</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        {/* RECONSTITUTED ACTIVE BOTTLES */}
+        <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>🧪 Active Reconstituted Bottles ({activeVialsList.length})</Text>
+
+        {activeVialsList.length === 0 ? (
+          <Text style={styles.emptyText}>No active mixed bottles. Tap "+ New Plan" in Planner or add a bottle to get started.</Text>
+        ) : (
+          activeVialsList.map((vial: any) => (
             <VialCard 
               key={vial.id}
               vial={vial}
@@ -131,8 +243,47 @@ export default function VialsScreen() {
               onStartNextVial={openNextVialModal}
             />
           ))
-        }
+        )}
       </ScrollView>
+
+      {/* QUICK ADD STOCK MODAL */}
+      <Modal visible={stockModalVisible} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.sectionTitle}>Add Unopened Inventory Stock</Text>
+            <Text style={{ color: c.textSub, fontSize: 13, marginBottom: 12 }}>
+              Add new unopened vials for {activeVialsList.find((v: any) => v.id === stockVialId)?.vialName || 'Peptide'}.
+            </Text>
+
+            <Text style={styles.label}>Vial Mass Size (mg)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={addStockMg}
+              onChangeText={setAddStockMg}
+              placeholder="10"
+            />
+
+            <Text style={styles.label}>Quantity to Add</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={addStockCount}
+              onChangeText={setAddStockCount}
+              placeholder="1"
+            />
+
+            <View style={styles.modalActionRow}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setStockModalVisible(false)}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSave} onPress={saveQuickAddStock}>
+                <Text style={styles.saveText}>+ Add Stock</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* EDIT MODAL */}
       <Modal visible={editModalVisible} transparent={true} animationType="fade">
@@ -298,31 +449,41 @@ export default function VialsScreen() {
           {activeVial && (
             <View style={styles.modalContent}>
               <Text style={styles.sectionTitle}>Log Past Injection</Text>
-              
-              {activeVial.subjects && activeVial.subjects.length > 0 && (
-                <>
-                  <Text style={styles.label}>Select Person</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 15 }}>
-                    {activeVial.subjects.map(sub => (
-                      <TouchableOpacity 
-                        key={sub.id} 
-                        style={{ padding: 10, borderWidth: 1, borderColor: pastLogSubjectId === sub.id ? '#3b82f6' : '#d1d5db', borderRadius: 8, backgroundColor: pastLogSubjectId === sub.id ? '#eff6ff' : '#fff' }}
-                        onPress={() => setPastLogSubjectId(sub.id)}
-                      >
-                        <Text style={{ color: pastLogSubjectId === sub.id ? '#1e40af' : '#374151', fontWeight: 'bold' }}>{sub.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </>
-              )}
 
               <DateInput 
-                label="Select Date" 
+                label="Injection Date" 
                 value={pastDateInput} 
                 onChange={setPastDateInput} 
               />
-              
-              <Text style={styles.label}>Dose Administered</Text>
+
+              {activeVial.subjects && activeVial.subjects.length > 0 && (
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.label}>Select Who Took This Injection</Text>
+                  {activeVial.subjects.map((sub: any) => (
+                    <TouchableOpacity 
+                      key={sub.id} 
+                      style={{ 
+                        padding: 10, 
+                        borderWidth: 1, 
+                        borderColor: pastLogSubjectId === sub.id ? '#3b82f6' : (theme === 'dark' ? '#374151' : '#e5e7eb'), 
+                        borderRadius: 8, 
+                        marginBottom: 6,
+                        backgroundColor: pastLogSubjectId === sub.id ? (theme === 'dark' ? '#1e3a8a' : '#eff6ff') : 'transparent' 
+                      }}
+                      onPress={() => {
+                        setPastLogSubjectId(sub.id);
+                        setPastDoseAmount(sub.doseAmount.toString());
+                        setPastDoseUnit(sub.doseUnit || 'mcg');
+                      }}
+                    >
+                      <Text style={{ fontWeight: 'bold', color: theme === 'dark' ? '#e5e7eb' : '#1f2937' }}>{sub.name}</Text>
+                      <Text style={{ fontSize: 12, color: theme === 'dark' ? '#9ca3af' : '#6b7280' }}>Default Target: {sub.doseAmount}{sub.doseUnit}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <Text style={styles.label}>Dose Amount Taken</Text>
               <View style={styles.doseInputRow}>
                 <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} 
                   style={styles.doseAmountInput} 
@@ -342,7 +503,7 @@ export default function VialsScreen() {
                     style={[styles.unitToggleBtn, pastDoseUnit === 'mg' && styles.unitToggleBtnActive]}
                     onPress={() => setPastDoseUnit('mg')}
                   >
-                    <Text style={[styles.unitButtonText, pastDoseUnit === 'mg' && styles.unitButtonActive]}>mg</Text>
+                    <Text style={[styles.unitButtonText, pastDoseUnit === 'mg' && styles.unitButtonTextActive]}>mg</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -358,7 +519,7 @@ export default function VialsScreen() {
                       Alert.alert("Missing Subject", "Please select who took the injection.");
                       return;
                     }
-                    const subject = activeVial.subjects.find(s => s.id === pastLogSubjectId);
+                    const subject = activeVial.subjects.find((s: any) => s.id === pastLogSubjectId);
                     const numericAmount = safeFloat(pastDoseAmount) || 0;
                     const calculatedMcg = pastDoseUnit === 'mg' ? numericAmount * 1000 : numericAmount;
                     logInjection(activeVial.id, numericAmount, pastDoseUnit, calculatedMcg, pastDateInput, subject.id, subject.name);
@@ -387,7 +548,7 @@ export default function VialsScreen() {
               
               <Text style={styles.label}>Select from Inventory</Text>
               {activeVial.inventory && activeVial.inventory.length > 0 ? (
-                activeVial.inventory.map((inv, idx) => (
+                activeVial.inventory.map((inv: any, idx: number) => (
                   <TouchableOpacity 
                     key={idx}
                     style={{ flexDirection: 'row', alignItems: 'center', padding: 10, borderWidth: 1, borderColor: nextVialInventoryIndex === idx ? '#3b82f6' : '#e5e7eb', borderRadius: 8, marginBottom: 8, backgroundColor: nextVialInventoryIndex === idx ? '#eff6ff' : '#fff' }}
