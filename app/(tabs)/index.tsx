@@ -1,14 +1,14 @@
 import React, { useContext, useMemo, useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VialContext } from '../../context/VialContext';
-import { getStyles } from '../../theme';
+import { VialContext, safeFloat } from '../../context/VialContext';
+import { getStyles, colors } from '../../theme';
 import { getProtocolPhaseForDate } from '../../utils/protocolMath';
-import ProtocolProgressBanner from '../../components/ProtocolProgressBanner';
 
 export default function ScheduleScreen() {
   const theme = useColorScheme() ?? 'light';
   const styles = getStyles(theme);
+  const c = colors[theme];
 
   const { vials, logInjection } = useContext(VialContext);
 
@@ -53,7 +53,7 @@ export default function ScheduleScreen() {
 
   // DYNAMIC TITRATION SCHEDULE FILTER
   const scheduledVials = useMemo(() => {
-    return vials.filter(vial => {
+    return vials.filter((vial: any) => {
       if (vial.isArchived) return false;
 
       const selectedDateStr = selectedDate.toISOString().split('T')[0];
@@ -79,14 +79,9 @@ export default function ScheduleScreen() {
     });
   }, [vials, currentDayName, isWeekday, selectedDateString, selectedDate]);
 
-  const amVials = scheduledVials.filter(v => v.timeOfDay === 'AM');
-  const pmVials = scheduledVials.filter(v => v.timeOfDay === 'PM');
-  const anyVials = scheduledVials.filter(v => !v.timeOfDay || v.timeOfDay === 'Any');
-
-  // Filter active protocol vials to render progress cards
-  const protocolVialsForDate = useMemo(() => {
-    return scheduledVials.filter(v => Array.isArray(v.protocolPhases) && v.protocolPhases.length > 0);
-  }, [scheduledVials]);
+  const amVials = scheduledVials.filter((v: any) => v.timeOfDay === 'AM');
+  const pmVials = scheduledVials.filter((v: any) => v.timeOfDay === 'PM');
+  const anyVials = scheduledVials.filter((v: any) => !v.timeOfDay || v.timeOfDay === 'Any');
 
   const handleQuickLog = (vial: any, subject: any = null) => {
     const phaseInfo = getProtocolPhaseForDate(vial, selectedDate);
@@ -154,36 +149,110 @@ export default function ScheduleScreen() {
       );
     }
 
-    // SINGLE SUBJECT RENDER WITH DYNAMIC TITRATION DOSE
+    // SINGLE SUBJECT RENDER WITH INTEGRATED PROGRESS TRACKER & DOSE OPTION
     const phaseInfo = getProtocolPhaseForDate(vial, selectedDate);
     const rawDoseAmount = phaseInfo.doseAmount;
     const unit = phaseInfo.doseUnit;
     const volumeMl = (phaseInfo.doseMcg / 1000) / concentrationMgPerMl;
     const units = (volumeMl * 100).toFixed(1);
 
+    // Protocol Timeline Progress Calculations
+    const hasProtocolPhases = Array.isArray(vial.protocolPhases) && vial.protocolPhases.length > 0;
+    let currentWeek = 1;
+    let totalWeeks = 1;
+    let percentComplete = 0;
+    let isTransitionWeek = false;
+    let prevDoseText = '';
+
+    if (hasProtocolPhases) {
+      const startDateStr = vial.startDate || vial.dateReconstituted || new Date().toISOString().split('T')[0];
+      let startMidnight = new Date().getTime();
+      if (startDateStr && typeof startDateStr === 'string' && startDateStr.includes('-')) {
+        const [sYear, sMonth, sDay] = startDateStr.split('-').map((n: string) => parseInt(n, 10));
+        startMidnight = new Date(sYear, sMonth - 1, sDay).getTime();
+      }
+      const targetMidnight = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()).getTime();
+      const diffDays = Math.max(0, Math.floor((targetMidnight - startMidnight) / (1000 * 60 * 60 * 24)));
+      currentWeek = Math.floor(diffDays / 7) + 1;
+      totalWeeks = vial.protocolPhases.reduce((sum: number, p: any) => sum + (safeFloat(p.durationWeeks) || 1), 0);
+      percentComplete = Math.min(100, Math.round((currentWeek / Math.max(1, totalWeeks)) * 100));
+
+      let accumulatedWeeks = 0;
+      for (let i = 0; i < vial.protocolPhases.length; i++) {
+        const p = vial.protocolPhases[i];
+        const duration = safeFloat(p.durationWeeks) || 1;
+        const phaseStartWeek = accumulatedWeeks + 1;
+        if (i > 0 && currentWeek === phaseStartWeek) {
+          isTransitionWeek = true;
+          const prevPhase = vial.protocolPhases[i - 1];
+          prevDoseText = `${prevPhase.doseAmount}${prevPhase.doseUnit}`;
+          break;
+        }
+        accumulatedWeeks += duration;
+      }
+    }
+
     return (
       <View key={vial.id} style={[
         styles.dashCard, 
-        { borderLeftColor: hasLoggedOnSelectedDate ? styles.dashCardDone.borderLeftColor : (vial.color || '#3b82f6') },
+        { borderLeftColor: hasLoggedOnSelectedDate ? styles.dashCardDone.borderLeftColor : (vial.color || '#3b82f6'), flexDirection: 'column' },
         hasLoggedOnSelectedDate && styles.dashCardDone
       ]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.dashVialName, hasLoggedOnSelectedDate && styles.dashTextDone]}>
+        {/* TOP ROW: VIAL NAME + PROTOCOL WEEK PILL */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <Text style={[styles.dashVialName, hasLoggedOnSelectedDate && styles.dashTextDone, { flex: 1, marginBottom: 0 }]}>
             {vial.vialName || vial.name}
-            {phaseInfo.phaseName ? <Text style={{ fontSize: 12, fontWeight: 'normal', color: theme === 'dark' ? '#9ca3af' : '#6b7280' }}> ({phaseInfo.phaseName})</Text> : null}
           </Text>
-          <Text style={[styles.dashDose, hasLoggedOnSelectedDate && styles.dashTextDone]}>{rawDoseAmount}{unit} ({primaryPeptide.name})</Text>
-          <Text style={[styles.dashUnits, hasLoggedOnSelectedDate && styles.dashTextDone]}>Pull: {units} Units</Text>
+          {hasProtocolPhases && (
+            <Text style={{ fontSize: 11, fontWeight: '800', color: c.primary, backgroundColor: c.primaryBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: c.primary }}>
+              W{currentWeek}/{totalWeeks} ({percentComplete}%)
+            </Text>
+          )}
         </View>
-        
-        {hasLoggedOnSelectedDate ? (
-          <View style={styles.dashLogBtnDone}><Text style={styles.dashLogTextDone}>✓ Done</Text></View>
-        ) : isFutureDate ? (
-          <View style={styles.dashUpcomingBadge}><Text style={styles.dashUpcomingText}>Upcoming</Text></View>
-        ) : (
-          <TouchableOpacity style={styles.dashLogBtn} onPress={() => handleQuickLog(vial)}>
-            <Text style={styles.dashLogText}>✓ Log</Text>
-          </TouchableOpacity>
+
+        {/* TIMELINE TRACK BAR (IF PROTOCOL) */}
+        {hasProtocolPhases && (
+          <View style={{ height: 4, backgroundColor: c.inputBg, borderRadius: 2, overflow: 'hidden', marginVertical: 4 }}>
+            <View style={{ height: '100%', width: `${percentComplete}%`, backgroundColor: vial.color || c.primary, borderRadius: 2 }} />
+          </View>
+        )}
+
+        {/* MAIN BODY ROW: DOSE DETAILS + LOG BUTTON */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            {phaseInfo.phaseName ? (
+              <Text style={{ fontSize: 11, color: c.textSub, fontWeight: '600', marginBottom: 2 }}>
+                {phaseInfo.phaseName}
+              </Text>
+            ) : null}
+
+            {/* BOLD TARGET DOSE & SYRINGE PULL */}
+            <Text style={[styles.dashDose, hasLoggedOnSelectedDate && styles.dashTextDone, { fontSize: 15, fontWeight: '800' }]}>
+              🎯 {rawDoseAmount}{unit} <Text style={{ fontSize: 12, fontWeight: '700', color: c.primary }}>({units} Units)</Text>
+            </Text>
+          </View>
+          
+          {hasLoggedOnSelectedDate ? (
+            <View style={styles.dashLogBtnDone}><Text style={styles.dashLogTextDone}>✓ Done</Text></View>
+          ) : isFutureDate ? (
+            <View style={styles.dashUpcomingBadge}><Text style={styles.dashUpcomingText}>Upcoming</Text></View>
+          ) : (
+            <TouchableOpacity style={styles.dashLogBtn} onPress={() => handleQuickLog(vial)}>
+              <Text style={styles.dashLogText}>✓ Log</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* TRANSITION ALERT CALLOUT */}
+        {isTransitionWeek && (
+          <View style={{ backgroundColor: c.warningBg, borderColor: c.warningBorder, borderWidth: 1, borderRadius: 6, padding: 8, marginTop: 8 }}>
+            <Text style={{ color: c.warningTextMain, fontWeight: '800', fontSize: 11 }}>
+              🚀 Dose Escalation This Week!
+            </Text>
+            <Text style={{ color: c.warningTextSub, fontSize: 11, marginTop: 1 }}>
+              Escalated from {prevDoseText} ➔ <Text style={{ fontWeight: '700' }}>{rawDoseAmount}{unit}</Text> ({units} Units).
+            </Text>
+          </View>
         )}
       </View>
     );
@@ -267,16 +336,11 @@ export default function ScheduleScreen() {
         <Text style={styles.dashHeader}>{isSelectedToday ? "Today's Schedule" : selectedDateString}</Text>
         <Text style={styles.dashSub}>{isFutureDate ? "Upcoming Injections" : isSelectedToday ? "Don't forget to log!" : "Past Injections"}</Text>
 
-        {/* PER-PROTOCOL PROGRESS BANNERS */}
-        {protocolVialsForDate.map((vial: any) => (
-          <ProtocolProgressBanner key={vial.id} vial={vial} targetDate={selectedDate} />
-        ))}
-
         {scheduledVials.length === 0 ? <Text style={styles.emptyText}>No injections scheduled for this date. 🎉</Text> : (
           <>
-            {amVials.length > 0 && <View style={styles.timeSection}><Text style={styles.timeHeader}>🌅 Morning (AM)</Text>{amVials.map(v => renderVialRow(v, styles.dashCardAM))}</View>}
-            {pmVials.length > 0 && <View style={styles.timeSection}><Text style={styles.timeHeader}>🌙 Evening (PM)</Text>{pmVials.map(v => renderVialRow(v, styles.dashCardPM))}</View>}
-            {anyVials.length > 0 && <View style={styles.timeSection}><Text style={styles.timeHeader}>⏱️ Anytime</Text>{anyVials.map(v => renderVialRow(v, styles.dashCardAny))}</View>}
+            {amVials.length > 0 && <View style={styles.timeSection}><Text style={styles.timeHeader}>🌅 Morning (AM)</Text>{amVials.map((v: any) => renderVialRow(v, styles.dashCardAM))}</View>}
+            {pmVials.length > 0 && <View style={styles.timeSection}><Text style={styles.timeHeader}>🌙 Evening (PM)</Text>{pmVials.map((v: any) => renderVialRow(v, styles.dashCardPM))}</View>}
+            {anyVials.length > 0 && <View style={styles.timeSection}><Text style={styles.timeHeader}>⏱️ Anytime</Text>{anyVials.map((v: any) => renderVialRow(v, styles.dashCardAny))}</View>}
           </>
         )}
       </ScrollView>
