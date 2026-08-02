@@ -3,6 +3,7 @@ import { Alert, ScrollView, Text, TouchableOpacity, View, useColorScheme } from 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VialContext } from '../../context/VialContext';
 import { getStyles } from '../../theme';
+import { getProtocolPhaseForDate } from '../../utils/protocolMath';
 
 export default function ScheduleScreen() {
   const theme = useColorScheme() ?? 'light';
@@ -49,29 +50,25 @@ export default function ScheduleScreen() {
   const isFutureDate = selectedMidnight > realTodayMidnight;
   const isSelectedToday = selectedMidnight.getTime() === realTodayMidnight.getTime();
 
-  // THE NEW SMART FILTER
+  // DYNAMIC TITRATION SCHEDULE FILTER
   const scheduledVials = useMemo(() => {
     return vials.filter(vial => {
       if (vial.isArchived) return false;
 
-      // NEW: The Ghost Buster
-      // Format the currently selected calendar date
       const selectedDateStr = selectedDate.toISOString().split('T')[0];
-      // Fallback to recon date just in case it's an old vial from before this update
       const protocolStart = vial.startDate || vial.dateReconstituted; 
     
-      // If the calendar is looking at a date BEFORE the protocol even started, hide it!
       if (selectedDateStr < protocolStart) {
         return false; 
       }
       
-      // RULE 1: If it was logged today, ALWAYS show it (Catches off-schedule injections!)
-      const hasLogged = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
+      const hasLogged = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
       if (hasLogged) return true;
 
-      // RULE 2: Is it scheduled for today?
-      const freq = vial.frequency || 'Daily';
-      const customDays = vial.selectedDays || (freq === 'Bi-Weekly' ? ['Mon', 'Thu'] : []);
+      // Compute active titration phase info for the selected calendar date
+      const phaseInfo = getProtocolPhaseForDate(vial, selectedDate);
+      const freq = phaseInfo.frequency || 'Daily';
+      const customDays = phaseInfo.selectedDays || [];
 
       if (freq === 'Daily') return true;
       if (freq === 'Mon-Fri' && isWeekday) return true;
@@ -79,16 +76,17 @@ export default function ScheduleScreen() {
       
       return false;
     });
-  }, [vials, currentDayName, isWeekday, selectedDateString]);
+  }, [vials, currentDayName, isWeekday, selectedDateString, selectedDate]);
 
   const amVials = scheduledVials.filter(v => v.timeOfDay === 'AM');
   const pmVials = scheduledVials.filter(v => v.timeOfDay === 'PM');
   const anyVials = scheduledVials.filter(v => !v.timeOfDay || v.timeOfDay === 'Any');
 
-  const handleQuickLog = (vial, subject = null) => {
-    const rawDoseAmount = subject ? subject.doseAmount : (vial.doseAmount || vial.doseMcg);
-    const unit = subject ? subject.doseUnit : (vial.doseUnit || 'mcg');
-    const mcg = subject ? subject.doseMcg : vial.doseMcg;
+  const handleQuickLog = (vial: any, subject: any = null) => {
+    const phaseInfo = getProtocolPhaseForDate(vial, selectedDate);
+    const rawDoseAmount = subject ? subject.doseAmount : phaseInfo.doseAmount;
+    const unit = subject ? subject.doseUnit : phaseInfo.doseUnit;
+    const mcg = subject ? subject.doseMcg : phaseInfo.doseMcg;
     const dateToLog = isSelectedToday ? null : selectedDate.toISOString();
     const whoText = subject ? ` for ${subject.name}` : '';
     
@@ -98,17 +96,16 @@ export default function ScheduleScreen() {
     ]);
   };
 
-  const renderVialRow = (vial, borderStyle) => {
+  const renderVialRow = (vial: any, borderStyle: any) => {
     const activePeptides = vial.peptides && vial.peptides.length > 0 ? vial.peptides : [{ name: vial.name, mg: vial.vialMg }];
     const primaryPeptide = activePeptides[0];
     const concentrationMgPerMl = primaryPeptide.mg / vial.bacWaterMl;
 
-    const hasLoggedOnSelectedDate = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
+    const hasLoggedOnSelectedDate = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
 
     if (vial.subjects && vial.subjects.length > 0) {
       // MULTI-SUBJECT RENDER
-      // In a multi-subject protocol, the protocol is considered "logged today" if AT LEAST one subject has logged today.
-      const hasAnyLogged = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
+      const hasAnyLogged = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
 
       return (
         <View key={vial.id} style={[
@@ -118,10 +115,10 @@ export default function ScheduleScreen() {
         ]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.dashVialName, hasAnyLogged && styles.dashTextDone]}>{vial.vialName || vial.name}</Text>
-            {vial.subjects.map(s => {
+            {vial.subjects.map((s: any) => {
               const volumeMl = (s.doseMcg / 1000) / concentrationMgPerMl;
               const units = (volumeMl * 100).toFixed(1);
-              const hasSubjectLogged = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString && log.subjectId === s.id);
+              const hasSubjectLogged = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString && log.subjectId === s.id);
               return (
                 <View key={s.id} style={{ marginBottom: 6 }}>
                   <Text style={[styles.dashDose, hasSubjectLogged && styles.dashTextDone]}>{s.name}: {s.doseAmount}{s.doseUnit} ({primaryPeptide.name})</Text>
@@ -132,8 +129,8 @@ export default function ScheduleScreen() {
           </View>
           
           <View style={{ justifyContent: 'center', gap: 5 }}>
-            {vial.subjects.map(s => {
-              const hasSubjectLogged = vial.logs?.some(log => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString && log.subjectId === s.id);
+            {vial.subjects.map((s: any) => {
+              const hasSubjectLogged = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString && log.subjectId === s.id);
               if (hasSubjectLogged) {
                 return <View key={s.id} style={styles.dashLogBtnDone}><Text style={styles.dashLogTextDone}>✓ {s.name}</Text></View>;
               } else if (isFutureDate) {
@@ -151,10 +148,11 @@ export default function ScheduleScreen() {
       );
     }
 
-    // SINGLE SUBJECT RENDER
-    const rawDoseAmount = vial.doseAmount || vial.doseMcg;
-    const unit = vial.doseUnit || 'mcg';
-    const volumeMl = (vial.doseMcg / 1000) / concentrationMgPerMl;
+    // SINGLE SUBJECT RENDER WITH DYNAMIC TITRATION DOSE
+    const phaseInfo = getProtocolPhaseForDate(vial, selectedDate);
+    const rawDoseAmount = phaseInfo.doseAmount;
+    const unit = phaseInfo.doseUnit;
+    const volumeMl = (phaseInfo.doseMcg / 1000) / concentrationMgPerMl;
     const units = (volumeMl * 100).toFixed(1);
 
     return (
@@ -164,7 +162,10 @@ export default function ScheduleScreen() {
         hasLoggedOnSelectedDate && styles.dashCardDone
       ]}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.dashVialName, hasLoggedOnSelectedDate && styles.dashTextDone]}>{vial.vialName || vial.name}</Text>
+          <Text style={[styles.dashVialName, hasLoggedOnSelectedDate && styles.dashTextDone]}>
+            {vial.vialName || vial.name}
+            {phaseInfo.phaseName ? <Text style={{ fontSize: 12, fontWeight: 'normal', color: theme === 'dark' ? '#9ca3af' : '#6b7280' }}> ({phaseInfo.phaseName})</Text> : null}
+          </Text>
           <Text style={[styles.dashDose, hasLoggedOnSelectedDate && styles.dashTextDone]}>{rawDoseAmount}{unit} ({primaryPeptide.name})</Text>
           <Text style={[styles.dashUnits, hasLoggedOnSelectedDate && styles.dashTextDone]}>Pull: {units} Units</Text>
         </View>
@@ -182,45 +183,34 @@ export default function ScheduleScreen() {
     );
   };
 
-  const getIndicatorDots = (calendarDate) => {
-    const dateStr = `${days[calendarDate.getDay()]}, ${months[calendarDate.getMonth()]} ${calendarDate.getDate()}`;
-    const isWkdy = calendarDate.getDay() >= 1 && calendarDate.getDay() <= 5;
-    const dayName = days[calendarDate.getDay()];
-    
-    const year = calendarDate.getFullYear();
-    const month = String(calendarDate.getMonth() + 1).padStart(2, '0');
-    const day = String(calendarDate.getDate()).padStart(2, '0');
-    const localCompareStr = `${year}-${month}-${day}`;
-
-    const dateMidnight = new Date(calendarDate);
-    dateMidnight.setHours(0, 0, 0, 0);
-    const isPast = dateMidnight < realTodayMidnight;
+  const getIndicatorDots = (dateObj: Date) => {
+    const dayName = days[dateObj.getDay()];
+    const isWkdy = dateObj.getDay() >= 1 && dateObj.getDay() <= 5;
+    const dateFormatted = `${dayName}, ${months[dateObj.getMonth()]} ${dateObj.getDate()}`;
+    const isPast = dateObj.setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
+    const dateStr = dateObj.toISOString().split('T')[0];
 
     let scheduledCount = 0;
     let loggedCount = 0;
 
-    vials.forEach(vial => {
+    vials.forEach((vial: any) => {
       if (vial.isArchived) return;
-
+      
       const protocolStart = vial.startDate || vial.dateReconstituted;
-      
-      // 3. FIXED: Compare the correct string formats! ("2026-03-15" < "2026-03-21")
-      if (localCompareStr < protocolStart) {
-        return; 
-      }
-      
-      const hasLogged = vial.logs?.some(log => typeof log.date ==='string' && log.date.split(' - ')[0] === dateStr);
-      if (hasLogged) loggedCount++;
+      if (dateStr < protocolStart) return;
 
-      const freq = vial.frequency || 'Daily';
-      const customDays = vial.selectedDays || (freq === 'Bi-Weekly' ? ['Mon', 'Thu'] : []);
+      const phaseInfo = getProtocolPhaseForDate(vial, dateObj);
+      const freq = phaseInfo.frequency || 'Daily';
+      const customDays = phaseInfo.selectedDays || [];
       
       let isScheduled = false;
       if (freq === 'Daily') isScheduled = true;
       if (freq === 'Mon-Fri' && isWkdy) isScheduled = true;
       if ((freq === 'Specific Days' || freq === 'Bi-Weekly') && customDays.includes(dayName)) isScheduled = true;
       
-      // If it's scheduled OR it was logged as an "extra" off-schedule dose, we count it as a required dot slot
+      const hasLogged = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === dateFormatted);
+      if (hasLogged) loggedCount++;
+
       if (isScheduled || hasLogged) scheduledCount++;
     });
 

@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import DateInput from '../../components/DateInput';
+import FrequencyPicker from '../../components/FrequencyPicker';
 import React, { useContext, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -151,7 +152,7 @@ export default function AddScreen() {
                         </TouchableOpacity>
                       )}
                     </View>
-                    <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={[styles.input, { marginBottom: 10 }]} placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} placeholder="Name (e.g. John)" value={sub.name} onChangeText={(val) => updateSubject(sub.id, 'name', val)} />
+                    <TextInput style={[styles.input, { marginBottom: 10 }]} placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} placeholder="Name (e.g. John)" value={sub.name} onChangeText={(val) => updateSubject(sub.id, 'name', val)} />
                     <View style={styles.doseInputRow}>
                       <TextInput placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#999'} style={styles.doseAmountInput} placeholder="Target Dose (e.g. 2.5)" keyboardType="numeric" value={sub.doseAmount} onChangeText={(val) => updateSubject(sub.id, 'doseAmount', val)} />
                       <View style={styles.unitToggleContainer}>
@@ -186,30 +187,14 @@ export default function AddScreen() {
               </>
             )}
 
-            <Text style={styles.label}>Injection Frequency</Text>
-            {/* Custom Day Picker */}
-            <View style={styles.unitToggleRow}>
-              {frequencyOptions.map(freq => (
-                <TouchableOpacity key={freq} style={[styles.unitButton, frequency === freq && styles.unitButtonActive]} onPress={() => setFrequency(freq)}>
-                  <Text style={[styles.unitButtonText, frequency === freq && styles.unitButtonTextActive]}>{freq}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            { frequency === 'Specific Days' && (
-              <View style={styles.dayPickerRow}>
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                  <TouchableOpacity 
-                    key={d} 
-                    style={[styles.dayPickerCircle, selectedDays.includes(d) && styles.dayPickerCircleActive]} 
-                    onPress={() => toggleDay(d)}
-                  >
-                    <Text style={[styles.dayPickerText, selectedDays.includes(d) && styles.dayPickerTextActive]}>
-                      {d.charAt(0)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+            <FrequencyPicker
+              label="Injection Frequency"
+              frequency={frequency}
+              selectedDays={selectedDays}
+              options={frequencyOptions}
+              onFrequencyChange={setFrequency}
+              onSelectedDaysChange={setSelectedDays}
+            />
 
             
 

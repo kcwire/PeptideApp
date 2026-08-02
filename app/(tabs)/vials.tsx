@@ -1,5 +1,6 @@
 import React, { useContext, useState } from 'react';
 import DateInput from '../../components/DateInput';
+import FrequencyPicker from '../../components/FrequencyPicker';
 import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VialContext, safeFloat, safeInt } from '../../context/VialContext';
@@ -241,29 +242,14 @@ export default function VialsScreen() {
               </TouchableOpacity>
             </View>
 
-              <Text style={styles.label}>Frequency</Text>
-              <View style={styles.unitToggleRow}>
-                {frequencyOptions.map(freq => (
-                  <TouchableOpacity key={freq} style={[styles.unitButton, editFreq === freq && styles.unitButtonActive]} onPress={() => setEditFreq(freq)}>
-                    <Text style={[styles.unitButtonText, editFreq === freq && styles.unitButtonTextActive, {fontSize: 12}]}>{freq}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              { (editFreq === 'Specific Days' || editFreq === 'Specific Days') && (
-                <View style={styles.dayPickerRow}>
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                    <TouchableOpacity 
-                      key={d} 
-                      style={[styles.dayPickerCircle, selectedDays.includes(d) && styles.dayPickerCircleActive]} 
-                      onPress={() => toggleDay(d)}
-                    >
-                      <Text style={[styles.dayPickerText, selectedDays.includes(d) && styles.dayPickerTextActive]}>
-                        {d.charAt(0)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+              <FrequencyPicker
+                label="Frequency"
+                frequency={editFreq}
+                selectedDays={selectedDays}
+                options={frequencyOptions}
+                onFrequencyChange={setEditFreq}
+                onSelectedDaysChange={setSelectedDays}
+              />
 
               <Text style={styles.label}>Time of Day</Text>
               <View style={styles.unitToggleRow}>
