@@ -49,6 +49,7 @@ export const calculateSyringeUnits = (doseMcg: number, concentrationMgMl: number
 
 /**
  * Calculates supply requirements for an entire peptide protocol configuration.
+ * Supports multi-subject dosage aggregation across all subjects.
  */
 export const calculateProtocolSupplies = (config: ProtocolConfig): ProtocolSupplyResult => {
   const vialMg = safeFloat(config.reconstitution?.vialMg);
@@ -61,27 +62,39 @@ export const calculateProtocolSupplies = (config: ProtocolConfig): ProtocolSuppl
   let totalPeptideMgRequired = 0;
   let totalDurationWeeks = 0;
 
+  const numSubjects = (config.isMultiSubject && config.subjects && config.subjects.length > 0) ? config.subjects.length : 1;
+
   const phaseResults: PhaseCalculationResult[] = (config.phases || []).map((phase: TitrationPhase) => {
     const durationWeeks = safeFloat(phase.durationWeeks);
     const doseAmount = safeFloat(phase.doseAmount);
     const doseMcg = phase.doseUnit === 'mg' ? doseAmount * 1000 : doseAmount;
     
     const injPerWeek = getInjectionsPerWeek(phase.frequency, phase.injectionsPerWeek, phase.selectedDays);
-    const totalInjections = Math.round(durationWeeks * injPerWeek);
-    const totalMgNeeded = (totalInjections * doseMcg) / 1000;
+    const totalInjectionsPerSubject = Math.round(durationWeeks * injPerWeek);
 
+    let phaseMgNeeded = 0;
+    if (config.isMultiSubject && phase.subjectDoses && phase.subjectDoses.length > 0) {
+      phaseMgNeeded = phase.subjectDoses.reduce((sum, sDose) => {
+        const sMcg = sDose.doseUnit === 'mg' ? safeFloat(sDose.doseAmount) * 1000 : safeFloat(sDose.doseAmount);
+        return sum + (totalInjectionsPerSubject * sMcg) / 1000;
+      }, 0);
+    } else {
+      phaseMgNeeded = ((totalInjectionsPerSubject * doseMcg) / 1000) * numSubjects;
+    }
+
+    const totalPhaseInjections = totalInjectionsPerSubject * numSubjects;
     const syringeUnitsPull = calculateSyringeUnits(doseMcg, concentrationMgMl);
 
     totalDurationWeeks += durationWeeks;
-    totalInjectionsCount += totalInjections;
-    totalPeptideMgRequired += totalMgNeeded;
+    totalInjectionsCount += totalPhaseInjections;
+    totalPeptideMgRequired += phaseMgNeeded;
 
     return {
       phaseId: phase.id,
       phaseName: phase.phaseName || 'Phase',
       durationWeeks,
-      totalInjections,
-      totalMgNeeded: safeFloat(totalMgNeeded.toFixed(2)),
+      totalInjections: totalPhaseInjections,
+      totalMgNeeded: safeFloat(phaseMgNeeded.toFixed(2)),
       doseMcg,
       syringeUnitsPull: safeFloat(syringeUnitsPull.toFixed(1)),
     };
@@ -119,25 +132,22 @@ export const calculateProtocolSupplies = (config: ProtocolConfig): ProtocolSuppl
 /**
  * Computes the active titration phase, dose, and frequency for a given vial on any target calendar date.
  */
-export const getProtocolPhaseForDate = (vial: any, targetDate: Date = new Date()) => {
-  if (!vial.protocolPhases || !Array.isArray(vial.protocolPhases) || vial.protocolPhases.length === 0) {
-    const doseAmount = safeFloat(vial.doseAmount || vial.doseMcg || 0);
-    const doseUnit = vial.doseUnit || 'mcg';
-    const doseMcg = doseUnit === 'mg' ? doseAmount * 1000 : doseAmount;
+export const getProtocolPhaseForDate = (vial: any, targetDate: Date) => {
+  const phases: TitrationPhase[] = vial.protocolPhases || [];
+  if (!phases || phases.length === 0) {
     return {
-      doseAmount,
-      doseUnit,
-      doseMcg,
+      phaseIndex: 0,
+      phaseName: 'Standard Phase',
+      doseAmount: vial.doseAmount || 0,
+      doseUnit: vial.doseUnit || 'mcg',
+      doseMcg: vial.doseUnit === 'mg' ? (vial.doseAmount || 0) * 1000 : (vial.doseAmount || 0),
       frequency: vial.frequency || 'Daily',
       selectedDays: vial.selectedDays || [],
-      phaseName: null,
-      phaseIndex: 0,
     };
   }
 
   const startDateStr = vial.startDate || vial.dateReconstituted || new Date().toISOString().split('T')[0];
   let startMidnight = new Date().getTime();
-  
   if (startDateStr && typeof startDateStr === 'string' && startDateStr.includes('-')) {
     const [sYear, sMonth, sDay] = startDateStr.split('-').map((n: string) => parseInt(n, 10));
     startMidnight = new Date(sYear, sMonth - 1, sDay).getTime();
@@ -145,34 +155,40 @@ export const getProtocolPhaseForDate = (vial: any, targetDate: Date = new Date()
 
   const targetMidnight = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
   const diffDays = Math.max(0, Math.floor((targetMidnight - startMidnight) / (1000 * 60 * 60 * 24)));
-  const diffWeeks = diffDays / 7;
+  const currentWeek = Math.floor(diffDays / 7) + 1;
 
   let accumulatedWeeks = 0;
-  let activePhase = vial.protocolPhases[vial.protocolPhases.length - 1]; // fallback to last phase
-  let activeIndex = vial.protocolPhases.length - 1;
+  for (let i = 0; i < phases.length; i++) {
+    const phase = phases[i];
+    const duration = safeFloat(phase.durationWeeks) || 1;
+    accumulatedWeeks += duration;
 
-  for (let i = 0; i < vial.protocolPhases.length; i++) {
-    const p = vial.protocolPhases[i];
-    const durationWeeks = safeFloat(p.durationWeeks) || 1;
-    if (diffWeeks < accumulatedWeeks + durationWeeks) {
-      activePhase = p;
-      activeIndex = i;
-      break;
+    if (currentWeek <= accumulatedWeeks || i === phases.length - 1) {
+      const doseAmount = safeFloat(phase.doseAmount);
+      const doseMcg = phase.doseUnit === 'mg' ? doseAmount * 1000 : doseAmount;
+      return {
+        phaseIndex: i,
+        phaseName: phase.phaseName || `Phase ${i + 1}`,
+        doseAmount,
+        doseUnit: phase.doseUnit || 'mcg',
+        doseMcg,
+        subjectDoses: phase.subjectDoses || [],
+        frequency: phase.frequency || 'Daily',
+        selectedDays: phase.selectedDays || [],
+      };
     }
-    accumulatedWeeks += durationWeeks;
   }
 
-  const doseAmount = safeFloat(activePhase.doseAmount);
-  const doseUnit = activePhase.doseUnit || 'mcg';
-  const doseMcg = doseUnit === 'mg' ? doseAmount * 1000 : doseAmount;
-
+  const lastPhase = phases[phases.length - 1];
+  const lastDoseAmount = safeFloat(lastPhase.doseAmount);
   return {
-    doseAmount,
-    doseUnit,
-    doseMcg,
-    frequency: activePhase.frequency || vial.frequency || 'Daily',
-    selectedDays: activePhase.selectedDays || vial.selectedDays || [],
-    phaseName: activePhase.phaseName || `Phase ${activeIndex + 1}`,
-    phaseIndex: activeIndex,
+    phaseIndex: phases.length - 1,
+    phaseName: lastPhase.phaseName || 'Maintenance',
+    doseAmount: lastDoseAmount,
+    doseUnit: lastPhase.doseUnit || 'mcg',
+    doseMcg: lastPhase.doseUnit === 'mg' ? lastDoseAmount * 1000 : lastDoseAmount,
+    subjectDoses: lastPhase.subjectDoses || [],
+    frequency: lastPhase.frequency || 'Daily',
+    selectedDays: lastPhase.selectedDays || [],
   };
 };

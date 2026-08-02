@@ -51,6 +51,8 @@ export const ProtocolProvider = ({ children }: { children: React.ReactNode }) =>
       id: newProtocol.id || Date.now().toString() + Math.random().toString(36).substring(2, 6),
       name: newProtocol.name || 'New Peptide Protocol',
       notes: newProtocol.notes || '',
+      isMultiSubject: !!newProtocol.isMultiSubject,
+      subjects: newProtocol.isMultiSubject && Array.isArray(newProtocol.subjects) ? newProtocol.subjects : undefined,
       peptides: peptidesList,
       phases: (newProtocol.phases || []).map((p, idx) => {
         const selectedDays = Array.isArray(p.selectedDays) && p.selectedDays.length > 0 ? p.selectedDays : ['Mon'];
@@ -60,6 +62,7 @@ export const ProtocolProvider = ({ children }: { children: React.ReactNode }) =>
           durationWeeks: safeFloat(p.durationWeeks) || 1,
           doseAmount: safeFloat(p.doseAmount),
           doseUnit: p.doseUnit || 'mcg',
+          subjectDoses: p.subjectDoses,
           frequency: p.frequency || 'Specific Days',
           selectedDays,
           injectionsPerWeek: p.frequency === 'Specific Days' ? selectedDays.length : (safeFloat(p.injectionsPerWeek) || 1),
@@ -155,6 +158,23 @@ export const ProtocolProvider = ({ children }: { children: React.ReactNode }) =>
       ? protocol.peptides
       : [{ name: protocol.name, mg: vialMg }];
 
+    const processedSubjects = (protocol.isMultiSubject && protocol.subjects && protocol.subjects.length > 0)
+      ? protocol.subjects.map(s => {
+          const sDoseObj = (initialPhase.subjectDoses || []).find((sd: any) => sd.subjectId === s.id) || {
+            doseAmount: initialPhase.doseAmount,
+            doseUnit: initialPhase.doseUnit,
+          };
+          const doseMcg = sDoseObj.doseUnit === 'mg' ? safeFloat(sDoseObj.doseAmount) * 1000 : safeFloat(sDoseObj.doseAmount);
+          return {
+            id: s.id,
+            name: s.name,
+            doseAmount: sDoseObj.doseAmount,
+            doseUnit: sDoseObj.doseUnit,
+            doseMcg,
+          };
+        })
+      : undefined;
+
     // Smart Inventory Deduction - Query current unopened stock matching vialMg
     let unopenedInStock = 0;
     (vials || []).forEach((v: any) => {
@@ -174,6 +194,7 @@ export const ProtocolProvider = ({ children }: { children: React.ReactNode }) =>
         notes: `Active Titration Protocol (${supplies.totalDurationWeeks} Weeks total)`,
         protocolId: protocol.id,
         peptides: activePeptides,
+        subjects: processedSubjects,
         bacWaterMl: protocol.reconstitution.bacWaterMl,
         doseAmount: initialPhase.doseAmount,
         doseUnit: initialPhase.doseUnit,

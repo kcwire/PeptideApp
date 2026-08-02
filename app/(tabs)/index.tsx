@@ -85,9 +85,24 @@ export default function ScheduleScreen() {
 
   const handleQuickLog = (vial: any, subject: any = null) => {
     const phaseInfo = getProtocolPhaseForDate(vial, selectedDate);
-    const rawDoseAmount = subject ? subject.doseAmount : phaseInfo.doseAmount;
-    const unit = subject ? subject.doseUnit : phaseInfo.doseUnit;
-    const mcg = subject ? subject.doseMcg : phaseInfo.doseMcg;
+
+    let rawDoseAmount = phaseInfo.doseAmount;
+    let unit = phaseInfo.doseUnit;
+    let mcg = phaseInfo.doseMcg;
+
+    if (subject) {
+      const sDose = (phaseInfo.subjectDoses || []).find((sd: any) => sd.subjectId === subject.id);
+      if (sDose) {
+        rawDoseAmount = sDose.doseAmount;
+        unit = sDose.doseUnit;
+        mcg = sDose.doseUnit === 'mg' ? safeFloat(sDose.doseAmount) * 1000 : safeFloat(sDose.doseAmount);
+      } else if (subject.doseAmount) {
+        rawDoseAmount = subject.doseAmount;
+        unit = subject.doseUnit;
+        mcg = subject.doseMcg;
+      }
+    }
+
     const dateToLog = isSelectedToday ? null : selectedDate.toISOString();
     const whoText = subject ? ` for ${subject.name}` : '';
     
@@ -103,58 +118,7 @@ export default function ScheduleScreen() {
     const concentrationMgPerMl = primaryPeptide.mg / vial.bacWaterMl;
 
     const hasLoggedOnSelectedDate = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
-
-    if (vial.subjects && vial.subjects.length > 0) {
-      // MULTI-SUBJECT RENDER
-      const hasAnyLogged = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
-
-      return (
-        <View key={vial.id} style={[
-          styles.dashCard, 
-          { borderLeftColor: hasAnyLogged ? styles.dashCardDone.borderLeftColor : (vial.color || '#3b82f6') },
-          hasAnyLogged && styles.dashCardDone
-        ]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.dashVialName, hasAnyLogged && styles.dashTextDone]}>{vial.vialName || vial.name}</Text>
-            {vial.subjects.map((s: any) => {
-              const volumeMl = (s.doseMcg / 1000) / concentrationMgPerMl;
-              const units = (volumeMl * 100).toFixed(1);
-              const hasSubjectLogged = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString && log.subjectId === s.id);
-              return (
-                <View key={s.id} style={{ marginBottom: 6 }}>
-                  <Text style={[styles.dashDose, hasSubjectLogged && styles.dashTextDone]}>{s.name}: {s.doseAmount}{s.doseUnit} ({primaryPeptide.name})</Text>
-                  <Text style={[styles.dashUnits, hasSubjectLogged && styles.dashTextDone]}>Pull: {units} Units</Text>
-                </View>
-              );
-            })}
-          </View>
-          
-          <View style={{ justifyContent: 'center', gap: 5 }}>
-            {vial.subjects.map((s: any) => {
-              const hasSubjectLogged = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString && log.subjectId === s.id);
-              if (hasSubjectLogged) {
-                return <View key={s.id} style={styles.dashLogBtnDone}><Text style={styles.dashLogTextDone}>✓ {s.name}</Text></View>;
-              } else if (isFutureDate) {
-                return <View key={s.id} style={styles.dashUpcomingBadge}><Text style={styles.dashUpcomingText}>Upcoming</Text></View>;
-              } else {
-                return (
-                  <TouchableOpacity key={s.id} style={styles.dashLogBtn} onPress={() => handleQuickLog(vial, s)}>
-                    <Text style={styles.dashLogText}>✓ {s.name}</Text>
-                  </TouchableOpacity>
-                );
-              }
-            })}
-          </View>
-        </View>
-      );
-    }
-
-    // SINGLE SUBJECT RENDER WITH PROMINENT FULL-WIDTH PROGRESS BAR & ENLARGED TYPOGRAPHY
     const phaseInfo = getProtocolPhaseForDate(vial, selectedDate);
-    const rawDoseAmount = phaseInfo.doseAmount;
-    const unit = phaseInfo.doseUnit;
-    const volumeMl = (phaseInfo.doseMcg / 1000) / concentrationMgPerMl;
-    const units = (volumeMl * 100).toFixed(1);
 
     // Protocol Timeline Progress Calculations
     const hasProtocolPhases = Array.isArray(vial.protocolPhases) && vial.protocolPhases.length > 0;
@@ -192,6 +156,89 @@ export default function ScheduleScreen() {
       }
     }
 
+    if (vial.subjects && vial.subjects.length > 0) {
+      // MULTI-SUBJECT RENDER
+      const hasAnyLogged = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString);
+
+      return (
+        <View key={vial.id} style={[
+          styles.dashCard, 
+          { borderLeftColor: hasAnyLogged ? styles.dashCardDone.borderLeftColor : (vial.color || '#3b82f6'), flexDirection: 'column', padding: 16 },
+          hasAnyLogged && styles.dashCardDone
+        ]}>
+          {/* HEADER ROW: VIAL NAME & PHASE NAME */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <Text style={[styles.dashVialName, hasAnyLogged && styles.dashTextDone, { fontSize: 17, fontWeight: '800', flex: 1, marginBottom: 0 }]}>
+              {vial.vialName || vial.name}
+            </Text>
+            {phaseInfo.phaseName ? (
+              <Text style={{ fontSize: 13, fontWeight: '700', color: c.textSub }}>
+                {phaseInfo.phaseName}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* PROMINENT FULL-WIDTH PROGRESS BAR WITH ENLARGED LABELS */}
+          {hasProtocolPhases && (
+            <View style={{ width: '100%', marginVertical: 8 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: c.primary }}>
+                  Week {currentWeek} of {totalWeeks}
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: c.primary }}>
+                  {percentComplete}% Complete
+                </Text>
+              </View>
+              <View style={{ height: 10, backgroundColor: c.inputBg, borderRadius: 5, overflow: 'hidden', width: '100%' }}>
+                <View style={{ height: '100%', width: `${percentComplete}%`, backgroundColor: vial.color || c.primary, borderRadius: 5 }} />
+              </View>
+            </View>
+          )}
+
+          {/* PER-SUBJECT LOGGING ROWS */}
+          {vial.subjects.map((s: any) => {
+            const sDose = (phaseInfo.subjectDoses || []).find((sd: any) => sd.subjectId === s.id) || {
+              doseAmount: s.doseAmount || phaseInfo.doseAmount,
+              doseUnit: s.doseUnit || phaseInfo.doseUnit,
+            };
+            const sMcg = sDose.doseUnit === 'mg' ? safeFloat(sDose.doseAmount) * 1000 : safeFloat(sDose.doseAmount);
+            const volumeMl = (sMcg / 1000) / concentrationMgPerMl;
+            const units = (volumeMl * 100).toFixed(1);
+            const hasSubjectLogged = vial.logs?.some((log: any) => typeof log.date === 'string' && log.date.split(' - ')[0] === selectedDateString && log.subjectId === s.id);
+
+            return (
+              <View key={s.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: c.border }}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={[styles.dashDose, hasSubjectLogged && styles.dashTextDone, { fontSize: 14, fontWeight: '700' }]}>
+                    👤 {s.name}: {sDose.doseAmount}{sDose.doseUnit} ({primaryPeptide.name})
+                  </Text>
+                  <Text style={[styles.dashUnits, hasSubjectLogged && styles.dashTextDone, { color: '#059669', fontSize: 13, fontWeight: '800', marginTop: 2 }]}>
+                    Pull: {units} Units
+                  </Text>
+                </View>
+
+                {hasSubjectLogged ? (
+                  <View style={styles.dashLogBtnDone}><Text style={styles.dashLogTextDone}>✓ {s.name}</Text></View>
+                ) : isFutureDate ? (
+                  <View style={styles.dashUpcomingBadge}><Text style={styles.dashUpcomingText}>Upcoming</Text></View>
+                ) : (
+                  <TouchableOpacity style={styles.dashLogBtn} onPress={() => handleQuickLog(vial, s)}>
+                    <Text style={styles.dashLogText}>✓ {s.name}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      );
+    }
+
+    // SINGLE SUBJECT RENDER
+    const rawDoseAmount = phaseInfo.doseAmount;
+    const unit = phaseInfo.doseUnit;
+    const volumeMl = (phaseInfo.doseMcg / 1000) / concentrationMgPerMl;
+    const units = (volumeMl * 100).toFixed(1);
+
     return (
       <View key={vial.id} style={[
         styles.dashCard, 
@@ -227,7 +274,7 @@ export default function ScheduleScreen() {
           </View>
         )}
 
-        {/* MAIN BODY ROW: TARGET DOSE, HIGH-VISIBILITY UNITS PULL, AND LOG BUTTON */}
+        {/* MAIN BODY ROW: DOSE DETAILS, HIGH-VISIBILITY UNITS PULL, AND LOG BUTTON */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
           <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={[styles.dashDose, hasLoggedOnSelectedDate && styles.dashTextDone, { fontSize: 15, fontWeight: '700' }]}>

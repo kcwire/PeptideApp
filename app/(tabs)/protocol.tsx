@@ -3,6 +3,7 @@ import {
   Alert,
   Modal,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -15,7 +16,7 @@ import * as Sharing from 'expo-sharing';
 import { ProtocolContext } from '../../context/ProtocolContext';
 import { VialContext, safeFloat, safeInt } from '../../context/VialContext';
 import { getStyles, colors } from '../../theme';
-import { ProtocolConfig, ProtocolPeptideItem, TitrationPhase } from '../../types/protocol';
+import { ProtocolConfig, ProtocolPeptideItem, ProtocolSubject, TitrationPhase } from '../../types/protocol';
 import ProtocolSupplySummary from '../../components/ProtocolSupplySummary';
 import TitrationPhaseBuilder from '../../components/TitrationPhaseBuilder';
 import { calculateProtocolSupplies } from '../../utils/protocolMath';
@@ -38,6 +39,13 @@ export default function ProtocolPlannerScreen() {
   const [vialMg, setVialMg] = useState('10');
   const [bacWaterMl, setBacWaterMl] = useState('2');
   const [wasteBufferPercent, setWasteBufferPercent] = useState('10');
+
+  // Multi-Subject State
+  const [isMultiSubject, setIsMultiSubject] = useState(false);
+  const [subjects, setSubjects] = useState<ProtocolSubject[]>([
+    { id: 'sub_1', name: 'Self' },
+    { id: 'sub_2', name: 'Partner' },
+  ]);
 
   // Peptides List State (Supports single peptide or mixed vials / multi-peptide blends)
   const [peptides, setPeptides] = useState<ProtocolPeptideItem[]>([
@@ -81,6 +89,11 @@ export default function ProtocolPlannerScreen() {
     setEditingProtocolId(null);
     setProtocolName('');
     setNotes('');
+    setIsMultiSubject(false);
+    setSubjects([
+      { id: 'sub_1', name: 'Self' },
+      { id: 'sub_2', name: 'Partner' },
+    ]);
     setPeptides([{ name: 'Retatrutide', mg: 10 }]);
     setVialMg('10');
     setBacWaterMl('2');
@@ -104,12 +117,34 @@ export default function ProtocolPlannerScreen() {
     setEditingProtocolId(protocol.id);
     setProtocolName(protocol.name);
     setNotes(protocol.notes || '');
+    setIsMultiSubject(!!protocol.isMultiSubject);
+    setSubjects(protocol.subjects && protocol.subjects.length > 0 ? protocol.subjects : [
+      { id: 'sub_1', name: 'Self' },
+      { id: 'sub_2', name: 'Partner' },
+    ]);
     setPeptides(protocol.peptides && protocol.peptides.length > 0 ? protocol.peptides : [{ name: protocol.name, mg: protocol.reconstitution.vialMg }]);
     setVialMg((protocol.reconstitution.vialMg || 10).toString());
     setBacWaterMl((protocol.reconstitution.bacWaterMl || 2).toString());
     setWasteBufferPercent((protocol.reconstitution.wasteBufferPercent || 10).toString());
     setPhases(protocol.phases);
     setModalVisible(true);
+  };
+
+  const handleAddSubject = () => {
+    const newSub: ProtocolSubject = {
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
+      name: `Subject ${subjects.length + 1}`,
+    };
+    setSubjects([...subjects, newSub]);
+  };
+
+  const handleRemoveSubject = (id: string) => {
+    if (subjects.length <= 1) return;
+    setSubjects(subjects.filter(s => s.id !== id));
+  };
+
+  const handleUpdateSubjectName = (id: string, name: string) => {
+    setSubjects(subjects.map(s => (s.id === id ? { ...s, name } : s)));
   };
 
   const handleAddPeptideToBlend = () => {
@@ -164,6 +199,8 @@ export default function ProtocolPlannerScreen() {
       id: editingProtocolId || undefined,
       name: protocolName.trim(),
       notes: notes.trim(),
+      isMultiSubject,
+      subjects: isMultiSubject ? subjects : undefined,
       peptides,
       phases,
       reconstitution: {
@@ -214,6 +251,8 @@ export default function ProtocolPlannerScreen() {
     const dummyConfig: ProtocolConfig = {
       id: 'preview',
       name: protocolName || 'Preview',
+      isMultiSubject,
+      subjects: isMultiSubject ? subjects : undefined,
       peptides,
       phases,
       reconstitution: {
@@ -225,7 +264,7 @@ export default function ProtocolPlannerScreen() {
       createdAt: '',
     };
     return calculateProtocolSupplies(dummyConfig);
-  }, [protocolName, peptides, phases, vialMg, bacWaterMl, wasteBufferPercent]);
+  }, [protocolName, isMultiSubject, subjects, peptides, phases, vialMg, bacWaterMl, wasteBufferPercent]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -263,7 +302,14 @@ export default function ProtocolPlannerScreen() {
               <View key={protocol.id} style={[styles.card, { marginBottom: 16, padding: 16 }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <View style={{ flex: 1, paddingRight: 10 }}>
-                    <Text style={{ fontSize: 18, fontWeight: '800', color: c.textMain }}>{protocol.name}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 18, fontWeight: '800', color: c.textMain }}>{protocol.name}</Text>
+                      {protocol.isMultiSubject && (
+                        <View style={{ backgroundColor: c.primaryBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: c.primary }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: c.primary }}>👥 Multi-Subject ({protocol.subjects?.length})</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={{ fontSize: 12, fontWeight: '700', color: c.primary, marginTop: 2 }}>
                       🧪 Compound(s): {peptideNamesText}
                     </Text>
@@ -367,6 +413,50 @@ export default function ProtocolPlannerScreen() {
               />
             </View>
 
+            {/* MULTI-SUBJECT TOGGLE & SUBJECT MANAGER */}
+            <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <View>
+                  <Text style={{ fontWeight: '800', color: c.textMain, fontSize: 15 }}>👥 Multi-Subject Protocol</Text>
+                  <Text style={{ fontSize: 12, color: c.textSub, marginTop: 2 }}>Track multiple subjects sharing this protocol & vial stock.</Text>
+                </View>
+                <Switch
+                  value={isMultiSubject}
+                  onValueChange={setIsMultiSubject}
+                  trackColor={{ false: c.border, true: c.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+
+              {isMultiSubject && (
+                <View style={{ marginTop: 10 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: c.textMain }}>Protocol Subjects</Text>
+                    <TouchableOpacity onPress={handleAddSubject}>
+                      <Text style={{ color: c.primary, fontWeight: '700', fontSize: 12 }}>+ Add Subject</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {subjects.map((sub, idx) => (
+                    <View key={sub.id} style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+                      <TextInput
+                        style={[styles.input, { flex: 1 }]}
+                        placeholder={`Subject ${idx + 1} Name`}
+                        placeholderTextColor={c.textMuted}
+                        value={sub.name}
+                        onChangeText={val => handleUpdateSubjectName(sub.id, val)}
+                      />
+                      {subjects.length > 1 && (
+                        <TouchableOpacity onPress={() => handleRemoveSubject(sub.id)}>
+                          <Text style={{ color: c.dangerText, fontWeight: '800', fontSize: 16 }}>✕</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+
             {/* PEPTIDE & MULTI-PEPTIDE BLEND BUILDER */}
             <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 16 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -456,7 +546,7 @@ export default function ProtocolPlannerScreen() {
             </View>
 
             {/* Titration Phases Builder */}
-            <TitrationPhaseBuilder phases={phases} onChangePhases={setPhases} />
+            <TitrationPhaseBuilder phases={phases} subjects={isMultiSubject ? subjects : []} onChangePhases={setPhases} />
 
             {/* Live Supply Summary Preview */}
             <ProtocolSupplySummary supplies={previewSupplies} />

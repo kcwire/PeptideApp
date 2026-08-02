@@ -167,12 +167,12 @@ export interface ProtocolSupplyResult {
 - [x] **TASK-105**: Multi-Day Persistence & Dynamic Date Titration Engine (`utils/protocolMath.ts`, `app/(tabs)/index.tsx`)
 - [x] **TASK-106**: Full V2 Database Backup & Restore Engine (`app/(tabs)/settings.tsx`, `context/ProtocolContext.tsx`)
 
-### Phase 3: Multi-Subject Protocol Support (In Progress / Planning)
-- [ ] **TASK-301**: Multi-Subject Protocol Interfaces & Data Types (`types/protocol.ts`)
-- [ ] **TASK-302**: Multi-Subject Supply Calculation Engine (`utils/protocolMath.ts`)
-- [ ] **TASK-303**: Multi-Subject Protocol Planner & Phase Builder UI (`app/(tabs)/protocol.tsx`, `components/TitrationPhaseBuilder.tsx`)
-- [ ] **TASK-304**: Multi-Subject Protocol Activation & Dashboard Logging (`context/ProtocolContext.tsx`, `app/(tabs)/index.tsx`)
-- [ ] **TASK-305**: Automated Unit Testing & E2E Verification (`scratch/test_multi_subject_protocol.js`)
+### Phase 3: Multi-Subject Protocol Support (Completed)
+- [x] **TASK-301**: Multi-Subject Protocol Interfaces & Data Types (`types/protocol.ts`)
+- [x] **TASK-302**: Multi-Subject Supply Calculation Engine (`utils/protocolMath.ts`)
+- [x] **TASK-303**: Multi-Subject Protocol Planner & Phase Builder UI (`app/(tabs)/protocol.tsx`, `components/TitrationPhaseBuilder.tsx`)
+- [x] **TASK-304**: Multi-Subject Protocol Activation & Dashboard Logging (`context/ProtocolContext.tsx`, `app/(tabs)/index.tsx`)
+- [x] **TASK-305**: Automated Unit Testing & E2E Verification (`scratch/test_multi_subject_protocol.js`)
 
 ---
 
