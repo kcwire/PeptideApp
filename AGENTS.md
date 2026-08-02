@@ -48,6 +48,14 @@ When executing automated refactorings, adding features, or debugging bugs, you a
   ```
 - **Rationale:** Hardcoding color strings instantly degrades accessibility, causes visual glitches in Dark Mode, and fragments brand identity across screens.
 
+### Commandment V: Rigorous Testing & Unit Test Implementation
+- **Rule:** Every code modification, new bug fix, or feature addition must be thoroughly tested before task completion. Implement unit tests wherever logical. Never deliver unverified code changes.
+- **Enforcement:**
+  - **Unit Testing for Domain Logic:** Any alteration or addition to pure calculation algorithms (e.g., peptide reconstitution math, dosage depletion, sanitization helpers like `safeFloat`, or date parsers) **must** be accompanied by unit tests covering standard behaviors and edge cases (division by zero, null/undefined inputs, empty arrays).
+  - **State & UI Verification:** When altering React state transformations or UI components, rigorously verify the changes across both single-subject and multi-subject protocol scenarios to ensure zero regressions in dosage decrementing or schedule rendering.
+  - **Continuous Validation:** Run static diagnostics (`npx tsc --noEmit`) and existing testing suites during development to ensure zero regressions in strict TypeScript conformance or existing logic.
+- **Rationale:** PeptideApp manages clinical and physiological dosage tracking. A regression in computational math or state logic could cause erroneous insulin syringe unit calculations or silent data loss.
+
 ---
 
 ## 2. Strategies for Minimizing Technical Debt
@@ -77,21 +85,40 @@ When executing automated refactorings, adding features, or debugging bugs, you a
 
 ---
 
-## 3. Development Workflow & Verification Checklist
+## 3. Testing Principles, Workflow & Verification Checklist
 
-Before finalizing any task or committing changes as an AI agent, review this mandatory checklist:
+Before finalizing any task or committing changes as an AI agent, review this mandatory verification and testing checklist:
 
-1. **Clear Metro Cache After Structural Moves:**
+### A. Core Testing Principles for Agents
+1. **Test Every Change:** Never assume a refactor or feature addition works strictly by visual review of the code. All modifications must undergo systematic verification.
+2. **Implement Unit Tests Where Logical:** Prioritize creating clean, isolated unit test files (using standard test libraries such as Jest or React Native Testing Library) for:
+   - Pure domain calculation utilities and reconstitution converters.
+   - Data import/export formatting and state hydration validators (`restoreData`).
+   - Custom React hooks or helper parsing functions.
+3. **Test Defensive Edge Cases:** Ensure your test cases explicitly challenge boundary limits (e.g., `NaN` inputs, zero-division in concentration calculation, future vs. past timezone dates, and zero-inventory carryovers).
+
+### B. Mandatory Verification Checklist
+1. **Run Static Type & Lint Checks:**
+   - Confirm strict TypeScript compliance with zero warnings or structural failures:
+     ```bash
+     npx tsc --noEmit
+     ```
+2. **Execute Unit Test Suites:**
+   - Run the project test runner to ensure all existing and newly authored unit tests pass without error:
+     ```bash
+     npm test
+     ```
+3. **Clear Metro Cache After Structural Moves:**
    - When moving components, restructuring folders, or modifying asset resolution, run:
      ```bash
      npx expo start -c
      ```
      This forces Metro Bundler to purge obsolete file-path caches and eliminates phantom unresolved dependency warnings.
-2. **Verify Offline Capability:**
+4. **Verify Offline Capability:**
    - Do not introduce network polling, third-party analytics telemetry, or remote server API blockers unless explicitly requested by user feature specifications. The app must launch and log injections instantly in airplane mode.
-3. **Check Edge-Case Mathematics:**
+5. **Check Edge-Case Mathematics:**
    - Validate zero-division safety: If a user enters `0` for BAC water volume or mass, ensure the app renders `0 Units` or an error notice rather than crashing with `Infinity` or `NaN`.
-4. **Sanity Check Multi-Subject compatibility:**
+6. **Sanity Check Multi-Subject Compatibility:**
    - Whenever updating dosage tracking logic or calendar rendering, verify that protocols utilizing an array of multiple subjects (`vial.subjects`) continue to calculate total mass depletion correctly alongside single-subject protocols.
 
 ---

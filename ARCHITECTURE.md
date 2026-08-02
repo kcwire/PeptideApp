@@ -12,6 +12,7 @@ PeptideApp is an **offline-first, highly responsive React Native mobile applicat
 1. **Offline-First & Zero-Knowledge Privacy:** All user protocol metadata, medical schedules, and dosage histories are persisted entirely on-device via local storage. There is no enforced cloud reliance, avoiding network latency and HIPAA/privacy liability.
 2. **Defensive Data Integrity:** All numerical inputs (mass, volume, counts, dosages) are enforced through strict sanitization boundaries before reaching global state or persistent storage, completely preventing NaN propagation or database corruption.
 3. **Strict Separation of Concerns:** Application logic, computational math, visual styling, and routing mechanics are physically decoupled across distinct functional architectural layers.
+4. **Test-Driven & Verifiable Boundaries:** Core business calculation formulas and data transformation utilities are strategically decoupled from UI lifecycle renders, enabling automated unit testing and rigorous verification for every code change.
 
 ---
 
@@ -111,3 +112,35 @@ PeptideApp eschews third-party CSS compilers (like native Tailwind ports) in fav
 - **Harmonized Color Palettes (`colors.light` & `colors.dark`):** Defines semantic roles (e.g., `card`, `cardDone`, `primary`, `successBg`, `resultBorder`, `warningBg`) rather than static color names.
 - **Vial Identifiers (`vialColors`):** A curated array of vibrant accent colors tested for contrast ratios against both dark and light backgrounds.
 - **Dynamic Factory (`getStyles(theme)`):** Functions consuming the system color scheme (`useColorScheme()`) to yield optimized style objects. All visual components invoke this generator to seamlessly adapt to system light/dark mode adjustments without requiring manual component restarts.
+
+---
+
+## 7. Testing Architecture & Quality Assurance Boundaries
+
+To guarantee clinical reliability and prevent regressions during rapid automated agent iterations or developer feature expansions, PeptideApp embeds modular testing boundaries across its architectural layers.
+
+### Testing Layer Matrix:
+
+```
++-----------------------------------------------------------------------+
+| UI & Presentational Layer (Components & Routing Screens)             |
+| -> Verification: Component behavior, snapshot & accessibility testing |
++-----------------------------------------------------------------------+
+                                  |
+                                  v
++-----------------------------------------------------------------------+
+| State & Persistence Layer (VialContext & Split-Key Storage DAL)       |
+| -> Verification: Mocked AsyncStorage atomic multiSet/multiGet cycles |
++-----------------------------------------------------------------------+
+                                  |
+                                  v
++-----------------------------------------------------------------------+
+| Domain & Mathematical Layer (Reconstitution Math & Sanitization)      |
+| -> Verification: Automated Unit Tests (Jest) - 100% Core Logic Cover  |
++-----------------------------------------------------------------------+
+```
+
+### Architectural Quality Rules:
+1. **Pure Utility Isolation for Unit Tests:** Mathematical calculation routines (concentration, dose unit extraction, cycle depletion estimates) and sanitization helpers (`safeFloat`, `safeInt`) must reside in pure functional modules or isolated helpers. This ensures automated unit tests execute reliably without requiring native mobile UI or mock browser DOM contexts.
+2. **Defensive Storage Testing:** Modifications to the state hydration or backup restore boundaries (`restoreData`) must be tested against malformed JSON payloads and historical storage keys (`@peptide_logs_{id}`) to guarantee backward compatibility and zero data corruption.
+3. **Continuous Test Implementation:** Whenever an AI agent or engineer introduces a new domain calculation, data modifier, or custom React hook, corresponding unit tests must be implemented simultaneously as a strict definition of done.
