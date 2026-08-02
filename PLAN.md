@@ -174,6 +174,12 @@ export interface ProtocolSupplyResult {
 - [x] **TASK-304**: Multi-Subject Protocol Activation & Dashboard Logging (`context/ProtocolContext.tsx`, `app/(tabs)/index.tsx`)
 - [x] **TASK-305**: Automated Unit Testing & E2E Verification (`scratch/test_multi_subject_protocol.js`)
 
+### Phase 4: Hybrid Smart Protocol Generator (In Progress / Planning)
+- [ ] **TASK-401**: Quick Generator State & Inputs (`components/TitrationPhaseBuilder.tsx`)
+- [ ] **TASK-402**: Equal & Remainder Duration Distribution Engine (`components/TitrationPhaseBuilder.tsx`)
+- [ ] **TASK-403**: Progressive Titration Dose Auto-Generation (`components/TitrationPhaseBuilder.tsx`)
+- [ ] **TASK-404**: Automated Unit Testing & Manual UI Verification (`scratch/test_smart_generator.js`)
+
 ---
 
 ## 🧪 Verification Plan
@@ -183,9 +189,11 @@ export interface ProtocolSupplyResult {
 - **Per-Protocol Progress Test**: Verify timeline calculations for concurrent protocols running on different start dates.
 - **Smart Inventory Deduction Test**: Assert existing unopened stock is subtracted from purchase requirement.
 - **Multi-Subject Protocol Test**: Verify multi-subject dose aggregation ($D_{\text{total}} = \sum D_{\text{subject}_i}$) and combined supply math.
+- **Smart Generator Test**: Verify week distribution algorithms and progressive dose generation.
 
 ### Manual Verification
 - Test Vials tab inventory hub controls (adding stock, reconstituting bottle from stock).
 - Test per-protocol progress cards and escalation banners on Dashboard.
 - Test protocol duplication and single protocol export/import.
 - Test multi-subject protocol plan creation and independent subject logging on Dashboard.
+- Test Quick Schedule Generator in Protocol Planner modal with custom weeks and phase counts.
