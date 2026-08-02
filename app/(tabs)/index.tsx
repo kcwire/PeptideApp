@@ -149,7 +149,7 @@ export default function ScheduleScreen() {
       );
     }
 
-    // SINGLE SUBJECT RENDER WITH INTEGRATED PROGRESS TRACKER & DOSE OPTION
+    // SINGLE SUBJECT RENDER WITH INTEGRATED PROGRESS BAR & HIGH-VISIBILITY UNITS PULL
     const phaseInfo = getProtocolPhaseForDate(vial, selectedDate);
     const rawDoseAmount = phaseInfo.doseAmount;
     const unit = phaseInfo.doseUnit;
@@ -198,37 +198,43 @@ export default function ScheduleScreen() {
         { borderLeftColor: hasLoggedOnSelectedDate ? styles.dashCardDone.borderLeftColor : (vial.color || '#3b82f6'), flexDirection: 'column' },
         hasLoggedOnSelectedDate && styles.dashCardDone
       ]}>
-        {/* TOP ROW: VIAL NAME + PROTOCOL WEEK PILL */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        {/* HEADER ROW: VIAL NAME & PHASE NAME */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
           <Text style={[styles.dashVialName, hasLoggedOnSelectedDate && styles.dashTextDone, { flex: 1, marginBottom: 0 }]}>
             {vial.vialName || vial.name}
           </Text>
-          {hasProtocolPhases && (
-            <Text style={{ fontSize: 11, fontWeight: '800', color: c.primary, backgroundColor: c.primaryBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, borderWidth: 1, borderColor: c.primary }}>
-              W{currentWeek}/{totalWeeks} ({percentComplete}%)
+          {phaseInfo.phaseName ? (
+            <Text style={{ fontSize: 11, fontWeight: '700', color: c.textSub }}>
+              {phaseInfo.phaseName}
             </Text>
-          )}
+          ) : null}
         </View>
 
-        {/* TIMELINE TRACK BAR (IF PROTOCOL) */}
+        {/* FULL PROGRESS BAR WITH WEEKS & PERCENTAGE TEXT */}
         {hasProtocolPhases && (
-          <View style={{ height: 4, backgroundColor: c.inputBg, borderRadius: 2, overflow: 'hidden', marginVertical: 4 }}>
-            <View style={{ height: '100%', width: `${percentComplete}%`, backgroundColor: vial.color || c.primary, borderRadius: 2 }} />
+          <View style={{ marginVertical: 6 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: c.primary }}>
+                Week {currentWeek} of {totalWeeks}
+              </Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: c.primary }}>
+                {percentComplete}% Complete
+              </Text>
+            </View>
+            <View style={{ height: 6, backgroundColor: c.inputBg, borderRadius: 3, overflow: 'hidden' }}>
+              <View style={{ height: '100%', width: `${percentComplete}%`, backgroundColor: vial.color || c.primary, borderRadius: 3 }} />
+            </View>
           </View>
         )}
 
-        {/* MAIN BODY ROW: DOSE DETAILS + LOG BUTTON */}
+        {/* MAIN BODY ROW: DOSE DETAILS, HIGH-VISIBILITY UNITS PULL, AND LOG BUTTON */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
           <View style={{ flex: 1, paddingRight: 8 }}>
-            {phaseInfo.phaseName ? (
-              <Text style={{ fontSize: 11, color: c.textSub, fontWeight: '600', marginBottom: 2 }}>
-                {phaseInfo.phaseName}
-              </Text>
-            ) : null}
-
-            {/* BOLD TARGET DOSE & SYRINGE PULL */}
-            <Text style={[styles.dashDose, hasLoggedOnSelectedDate && styles.dashTextDone, { fontSize: 15, fontWeight: '800' }]}>
-              🎯 {rawDoseAmount}{unit} <Text style={{ fontSize: 12, fontWeight: '700', color: c.primary }}>({units} Units)</Text>
+            <Text style={[styles.dashDose, hasLoggedOnSelectedDate && styles.dashTextDone]}>
+              {rawDoseAmount}{unit} ({primaryPeptide.name})
+            </Text>
+            <Text style={[styles.dashUnits, hasLoggedOnSelectedDate && styles.dashTextDone, { color: '#059669', fontSize: 14, fontWeight: '800', marginTop: 2 }]}>
+              Pull: {units} Units
             </Text>
           </View>
           
