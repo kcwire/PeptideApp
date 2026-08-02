@@ -149,7 +149,7 @@ export default function ScheduleScreen() {
       );
     }
 
-    // SINGLE SUBJECT RENDER WITH INTEGRATED PROGRESS BAR & HIGH-VISIBILITY UNITS PULL
+    // SINGLE SUBJECT RENDER WITH PROMINENT FULL-WIDTH PROGRESS BAR & ENLARGED TYPOGRAPHY
     const phaseInfo = getProtocolPhaseForDate(vial, selectedDate);
     const rawDoseAmount = phaseInfo.doseAmount;
     const unit = phaseInfo.doseUnit;
@@ -195,45 +195,45 @@ export default function ScheduleScreen() {
     return (
       <View key={vial.id} style={[
         styles.dashCard, 
-        { borderLeftColor: hasLoggedOnSelectedDate ? styles.dashCardDone.borderLeftColor : (vial.color || '#3b82f6'), flexDirection: 'column' },
+        { borderLeftColor: hasLoggedOnSelectedDate ? styles.dashCardDone.borderLeftColor : (vial.color || '#3b82f6'), flexDirection: 'column', padding: 16 },
         hasLoggedOnSelectedDate && styles.dashCardDone
       ]}>
         {/* HEADER ROW: VIAL NAME & PHASE NAME */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-          <Text style={[styles.dashVialName, hasLoggedOnSelectedDate && styles.dashTextDone, { flex: 1, marginBottom: 0 }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <Text style={[styles.dashVialName, hasLoggedOnSelectedDate && styles.dashTextDone, { fontSize: 17, fontWeight: '800', flex: 1, marginBottom: 0 }]}>
             {vial.vialName || vial.name}
           </Text>
           {phaseInfo.phaseName ? (
-            <Text style={{ fontSize: 11, fontWeight: '700', color: c.textSub }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: c.textSub }}>
               {phaseInfo.phaseName}
             </Text>
           ) : null}
         </View>
 
-        {/* FULL PROGRESS BAR WITH WEEKS & PERCENTAGE TEXT */}
+        {/* PROMINENT FULL-WIDTH PROGRESS BAR WITH ENLARGED LABELS */}
         {hasProtocolPhases && (
-          <View style={{ marginVertical: 6 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: c.primary }}>
+          <View style={{ width: '100%', marginVertical: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: c.primary }}>
                 Week {currentWeek} of {totalWeeks}
               </Text>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: c.primary }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: c.primary }}>
                 {percentComplete}% Complete
               </Text>
             </View>
-            <View style={{ height: 6, backgroundColor: c.inputBg, borderRadius: 3, overflow: 'hidden' }}>
-              <View style={{ height: '100%', width: `${percentComplete}%`, backgroundColor: vial.color || c.primary, borderRadius: 3 }} />
+            <View style={{ height: 10, backgroundColor: c.inputBg, borderRadius: 5, overflow: 'hidden', width: '100%' }}>
+              <View style={{ height: '100%', width: `${percentComplete}%`, backgroundColor: vial.color || c.primary, borderRadius: 5 }} />
             </View>
           </View>
         )}
 
-        {/* MAIN BODY ROW: DOSE DETAILS, HIGH-VISIBILITY UNITS PULL, AND LOG BUTTON */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+        {/* MAIN BODY ROW: TARGET DOSE, HIGH-VISIBILITY UNITS PULL, AND LOG BUTTON */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
           <View style={{ flex: 1, paddingRight: 8 }}>
-            <Text style={[styles.dashDose, hasLoggedOnSelectedDate && styles.dashTextDone]}>
+            <Text style={[styles.dashDose, hasLoggedOnSelectedDate && styles.dashTextDone, { fontSize: 15, fontWeight: '700' }]}>
               {rawDoseAmount}{unit} ({primaryPeptide.name})
             </Text>
-            <Text style={[styles.dashUnits, hasLoggedOnSelectedDate && styles.dashTextDone, { color: '#059669', fontSize: 14, fontWeight: '800', marginTop: 2 }]}>
+            <Text style={[styles.dashUnits, hasLoggedOnSelectedDate && styles.dashTextDone, { color: '#059669', fontSize: 15, fontWeight: '900', marginTop: 3 }]}>
               Pull: {units} Units
             </Text>
           </View>
@@ -251,11 +251,11 @@ export default function ScheduleScreen() {
 
         {/* TRANSITION ALERT CALLOUT */}
         {isTransitionWeek && (
-          <View style={{ backgroundColor: c.warningBg, borderColor: c.warningBorder, borderWidth: 1, borderRadius: 6, padding: 8, marginTop: 8 }}>
-            <Text style={{ color: c.warningTextMain, fontWeight: '800', fontSize: 11 }}>
+          <View style={{ backgroundColor: c.warningBg, borderColor: c.warningBorder, borderWidth: 1, borderRadius: 8, padding: 10, marginTop: 10 }}>
+            <Text style={{ color: c.warningTextMain, fontWeight: '800', fontSize: 12 }}>
               🚀 Dose Escalation This Week!
             </Text>
-            <Text style={{ color: c.warningTextSub, fontSize: 11, marginTop: 1 }}>
+            <Text style={{ color: c.warningTextSub, fontSize: 12, marginTop: 2 }}>
               Escalated from {prevDoseText} ➔ <Text style={{ fontWeight: '700' }}>{rawDoseAmount}{unit}</Text> ({units} Units).
             </Text>
           </View>
