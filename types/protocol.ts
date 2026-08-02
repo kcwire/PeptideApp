@@ -10,16 +10,22 @@ export interface TitrationPhase {
 }
 
 export interface ReconstitutionSpec {
-  vialMg: number;               // Mass per vial (e.g. 5mg, 10mg)
+  vialMg: number;               // Total mass per vial (e.g. 5mg, 10mg)
   bacWaterMl: number;           // BAC water volume per vial in mL (e.g. 2ml)
   syringeCapacityUnits: number; // Syringe capacity in Units (e.g. 100 for U-100)
   wasteBufferPercent: number;   // Syringe buffer percentage (e.g. 10 for 10%)
+}
+
+export interface ProtocolPeptideItem {
+  name: string;
+  mg: number;
 }
 
 export interface ProtocolConfig {
   id: string;
   name: string;
   notes?: string;
+  peptides?: ProtocolPeptideItem[]; // List of peptides for single or mixed blend vials
   phases: TitrationPhase[];
   reconstitution: ReconstitutionSpec;
   createdAt: string;
@@ -46,5 +52,5 @@ export interface ProtocolSupplyResult {
   totalSyringesRequired: number;
   concentrationMgMl: number;
   phases: PhaseCalculationResult[];
-  vialExpirationWarning: boolean; // True if a single reconstituted vial lasts > 28 days
+  vialExpirationWarning: boolean; // True if a single reconstituted vial lasts > 45 days
 }

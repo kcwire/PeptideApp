@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -13,11 +13,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { ProtocolContext } from '../../context/ProtocolContext';
+import { VialContext, safeFloat, safeInt } from '../../context/VialContext';
 import { getStyles, colors } from '../../theme';
-import { ProtocolConfig, TitrationPhase } from '../../types/protocol';
+import { ProtocolConfig, ProtocolPeptideItem, TitrationPhase } from '../../types/protocol';
 import ProtocolSupplySummary from '../../components/ProtocolSupplySummary';
 import TitrationPhaseBuilder from '../../components/TitrationPhaseBuilder';
-import { safeFloat, safeInt } from '../../context/VialContext';
 import { calculateProtocolSupplies } from '../../utils/protocolMath';
 
 export default function ProtocolPlannerScreen() {
@@ -26,6 +26,7 @@ export default function ProtocolPlannerScreen() {
   const c = colors[theme];
 
   const { protocols, saveProtocol, duplicateProtocol, deleteProtocol, convertProtocolToVials } = useContext(ProtocolContext);
+  const { vials } = useContext(VialContext) || {};
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
@@ -37,6 +38,11 @@ export default function ProtocolPlannerScreen() {
   const [vialMg, setVialMg] = useState('10');
   const [bacWaterMl, setBacWaterMl] = useState('2');
   const [wasteBufferPercent, setWasteBufferPercent] = useState('10');
+
+  // Peptides List State (Supports single peptide or mixed vials / multi-peptide blends)
+  const [peptides, setPeptides] = useState<ProtocolPeptideItem[]>([
+    { name: 'Retatrutide', mg: 10 }
+  ]);
 
   // Phases List State
   const [phases, setPhases] = useState<TitrationPhase[]>([
@@ -52,10 +58,30 @@ export default function ProtocolPlannerScreen() {
     },
   ]);
 
+  // Extract unique peptides / blends from existing inventory for quick-select
+  const existingInventoryItems = useMemo(() => {
+    if (!vials || !Array.isArray(vials)) return [];
+    const itemsMap = new Map();
+    vials.forEach((v: any) => {
+      const name = v.vialName || v.name;
+      const mg = safeFloat(v.vialMg) || (v.peptides ? v.peptides.reduce((s: number, p: any) => s + safeFloat(p.mg), 0) : 10);
+      const key = `${name}_${mg}`;
+      if (!itemsMap.has(key)) {
+        itemsMap.set(key, {
+          name,
+          mg,
+          peptides: v.peptides && v.peptides.length > 0 ? v.peptides : [{ name, mg }],
+        });
+      }
+    });
+    return Array.from(itemsMap.values());
+  }, [vials]);
+
   const openCreateModal = () => {
     setEditingProtocolId(null);
     setProtocolName('');
     setNotes('');
+    setPeptides([{ name: 'Retatrutide', mg: 10 }]);
     setVialMg('10');
     setBacWaterMl('2');
     setWasteBufferPercent('10');
@@ -76,43 +102,61 @@ export default function ProtocolPlannerScreen() {
 
   const openEditModal = (protocol: ProtocolConfig) => {
     setEditingProtocolId(protocol.id);
-    setProtocolName(protocol.name || '');
+    setProtocolName(protocol.name);
     setNotes(protocol.notes || '');
-    setVialMg(protocol.reconstitution?.vialMg?.toString() || '10');
-    setBacWaterMl(protocol.reconstitution?.bacWaterMl?.toString() || '2');
-    setWasteBufferPercent(protocol.reconstitution?.wasteBufferPercent?.toString() || '10');
-    setPhases(protocol.phases || []);
+    setPeptides(protocol.peptides && protocol.peptides.length > 0 ? protocol.peptides : [{ name: protocol.name, mg: protocol.reconstitution.vialMg }]);
+    setVialMg((protocol.reconstitution.vialMg || 10).toString());
+    setBacWaterMl((protocol.reconstitution.bacWaterMl || 2).toString());
+    setWasteBufferPercent((protocol.reconstitution.wasteBufferPercent || 10).toString());
+    setPhases(protocol.phases);
     setModalVisible(true);
   };
 
-  const handleShareProtocol = async (protocol: ProtocolConfig) => {
-    try {
-      const payloadStr = JSON.stringify(protocol, null, 2);
-      const cleanName = (protocol.name || 'Protocol').replace(/[^a-zA-Z0-9]/g, '_');
-      const file = new File(Paths.cache, `${cleanName}_Protocol.json`);
-      if (!file.exists) file.create();
-      file.write(payloadStr);
+  const handleAddPeptideToBlend = () => {
+    const updated = [...peptides, { name: '', mg: 5 }];
+    setPeptides(updated);
+    recalculateTotalVialMg(updated);
+  };
 
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, {
-          mimeType: 'application/json',
-          dialogTitle: `Share Protocol Template: ${protocol.name}`
-        });
-      } else {
-        Alert.alert('Protocol Template Shared', payloadStr);
-      }
-    } catch (err: any) {
-      Alert.alert('Share Failed', err?.message || 'Could not share protocol template.');
+  const handleRemovePeptideFromBlend = (index: number) => {
+    if (peptides.length <= 1) return;
+    const updated = peptides.filter((_, i) => i !== index);
+    setPeptides(updated);
+    recalculateTotalVialMg(updated);
+  };
+
+  const handlePeptideChange = (index: number, field: 'name' | 'mg', value: string) => {
+    const updated = [...peptides];
+    if (field === 'mg') {
+      updated[index].mg = safeFloat(value);
+    } else {
+      updated[index].name = value;
     }
+    setPeptides(updated);
+    recalculateTotalVialMg(updated);
+  };
+
+  const recalculateTotalVialMg = (pepList: ProtocolPeptideItem[]) => {
+    const totalMg = pepList.reduce((sum, p) => sum + (safeFloat(p.mg) || 0), 0);
+    if (totalMg > 0) {
+      setVialMg(totalMg.toString());
+    }
+  };
+
+  const handleSelectFromInventory = (item: any) => {
+    setProtocolName(`${item.name} Protocol`);
+    setPeptides(item.peptides);
+    setVialMg(item.mg.toString());
   };
 
   const handleSave = () => {
     if (!protocolName.trim()) {
-      Alert.alert('Missing Name', 'Please enter a name for this peptide protocol.');
+      Alert.alert('Validation Error', 'Please enter a protocol name.');
       return;
     }
+
     if (phases.length === 0) {
-      Alert.alert('Missing Phases', 'Please add at least one titration phase.');
+      Alert.alert('Validation Error', 'Please configure at least one titration phase.');
       return;
     }
 
@@ -120,12 +164,13 @@ export default function ProtocolPlannerScreen() {
       id: editingProtocolId || undefined,
       name: protocolName.trim(),
       notes: notes.trim(),
+      peptides,
       phases,
       reconstitution: {
-        vialMg: safeFloat(vialMg),
-        bacWaterMl: safeFloat(bacWaterMl),
+        vialMg: safeFloat(vialMg) || 10,
+        bacWaterMl: safeFloat(bacWaterMl) || 2,
         syringeCapacityUnits: 100,
-        wasteBufferPercent: safeFloat(wasteBufferPercent),
+        wasteBufferPercent: safeFloat(wasteBufferPercent) || 10,
       },
     };
 
@@ -133,54 +178,95 @@ export default function ProtocolPlannerScreen() {
     setModalVisible(false);
   };
 
-  // Preview real-time calculation inside modal
-  const previewProtocol: ProtocolConfig = {
-    id: 'preview',
-    name: protocolName || 'Preview Plan',
-    phases,
-    reconstitution: {
-      vialMg: safeFloat(vialMg),
-      bacWaterMl: safeFloat(bacWaterMl),
-      syringeCapacityUnits: 100,
-      wasteBufferPercent: safeFloat(wasteBufferPercent),
-    },
-    createdAt: new Date().toISOString(),
+  const handleShareProtocol = async (protocol: ProtocolConfig) => {
+    try {
+      const supplies = calculateProtocolSupplies(protocol);
+      const exportData = {
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        protocol,
+        calculatedSupplies: supplies,
+      };
+
+      const jsonStr = JSON.stringify(exportData, null, 2);
+      const filename = `${protocol.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_protocol.json`;
+      const fileUri = `${Paths.document.uri}/${filename}`;
+
+      const file = new File(fileUri);
+      await file.write(jsonStr);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: `Share Protocol: ${protocol.name}`,
+          UTI: 'public.json',
+        });
+      } else {
+        Alert.alert('Sharing Unavailable', `Protocol saved locally to: ${fileUri}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Sharing Error', err.message || 'Failed to export protocol template.');
+    }
   };
-  const previewSupplies = calculateProtocolSupplies(previewProtocol);
+
+  // Preview live supply calculations in modal
+  const previewSupplies = useMemo(() => {
+    const dummyConfig: ProtocolConfig = {
+      id: 'preview',
+      name: protocolName || 'Preview',
+      peptides,
+      phases,
+      reconstitution: {
+        vialMg: safeFloat(vialMg) || 10,
+        bacWaterMl: safeFloat(bacWaterMl) || 2,
+        syringeCapacityUnits: 100,
+        wasteBufferPercent: safeFloat(wasteBufferPercent) || 10,
+      },
+      createdAt: '',
+    };
+    return calculateProtocolSupplies(dummyConfig);
+  }, [protocolName, peptides, phases, vialMg, bacWaterMl, wasteBufferPercent]);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+        {/* HEADER & NEW PLAN BUTTON */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <View>
             <Text style={styles.dashHeader}>Protocol Planner 📋</Text>
-            <Text style={styles.dashSub}>Design titration schedules & supply needs.</Text>
+            <Text style={styles.dashSub}>Design custom titration schedules and supply math.</Text>
           </View>
-
-          <TouchableOpacity onPress={openCreateModal} style={styles.primaryButton}>
-            <Text style={styles.buttonText}>+ New Plan</Text>
+          <TouchableOpacity onPress={openCreateModal} style={[styles.primaryButton, { paddingHorizontal: 14, paddingVertical: 10 }]}>
+            <Text style={[styles.buttonText, { fontSize: 13 }]}>+ New Plan</Text>
           </TouchableOpacity>
         </View>
 
-        {/* List of Saved Protocols */}
-        <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Saved Protocol Plans ({protocols?.length || 0})</Text>
-
-        {!protocols || protocols.length === 0 ? (
-          <View style={[styles.card, { padding: 24, alignItems: 'center', borderStyle: 'dashed' }]}>
-            <Text style={{ fontSize: 32, marginBottom: 8 }}>🧪</Text>
-            <Text style={{ fontWeight: '700', color: c.textMain, fontSize: 16, textAlign: 'center' }}>No Protocol Plans Created</Text>
-            <Text style={{ color: c.textSub, fontSize: 13, textAlign: 'center', marginTop: 4 }}>
-              Tap "+ New Plan" to define titration ramp-ups and calculate your total peptide, water, and syringe supply needs.
+        {/* PROTOCOLS LIST */}
+        {protocols.length === 0 ? (
+          <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 24, alignItems: 'center' }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: c.textMain, marginBottom: 6 }}>No Protocol Plans Created</Text>
+            <Text style={{ color: c.textSub, textAlign: 'center', fontSize: 13, marginBottom: 16 }}>
+              Tap "+ New Plan" above to create a titration schedule (e.g. 24-Week Retatrutide Ramp-Up Plan).
             </Text>
+            <TouchableOpacity onPress={openCreateModal} style={styles.primaryButton}>
+              <Text style={styles.buttonText}>+ Create First Protocol Plan</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           protocols.map((protocol: ProtocolConfig) => {
             const supplies = calculateProtocolSupplies(protocol);
+            const peptideNamesText = protocol.peptides && protocol.peptides.length > 0 
+              ? protocol.peptides.map(p => `${p.name} (${p.mg}mg)`).join(' + ')
+              : `${protocol.name} (${protocol.reconstitution.vialMg}mg)`;
+
             return (
               <View key={protocol.id} style={[styles.card, { marginBottom: 16, padding: 16 }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <View style={{ flex: 1, paddingRight: 10 }}>
                     <Text style={{ fontSize: 18, fontWeight: '800', color: c.textMain }}>{protocol.name}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: c.primary, marginTop: 2 }}>
+                      🧪 Compound(s): {peptideNamesText}
+                    </Text>
                     {protocol.notes ? <Text style={{ color: c.textSub, fontSize: 12, marginTop: 2 }}>{protocol.notes}</Text> : null}
                   </View>
 
@@ -237,6 +323,28 @@ export default function ProtocolPlannerScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* QUICK SELECT FROM INVENTORY */}
+            {existingInventoryItems.length > 0 && (
+              <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 16 }}>
+                <Text style={{ fontWeight: '700', color: c.textMain, fontSize: 14, marginBottom: 8 }}>
+                  📦 Select Peptide from Inventory
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  {existingInventoryItems.map((item, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      onPress={() => handleSelectFromInventory(item)}
+                      style={{ backgroundColor: c.primaryBg, borderWidth: 1, borderColor: c.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+                    >
+                      <Text style={{ color: c.primary, fontWeight: '700', fontSize: 12 }}>
+                        {item.name} ({item.mg}mg)
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             {/* Protocol Meta */}
             <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 16 }}>
               <Text style={{ fontWeight: '700', color: c.textMain, marginBottom: 4 }}>Protocol Name</Text>
@@ -259,13 +367,58 @@ export default function ProtocolPlannerScreen() {
               />
             </View>
 
+            {/* PEPTIDE & MULTI-PEPTIDE BLEND BUILDER */}
+            <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <Text style={{ fontWeight: '800', color: c.textMain, fontSize: 15 }}>
+                  🧪 Peptides & Mixed Vial Blend
+                </Text>
+                <TouchableOpacity onPress={handleAddPeptideToBlend}>
+                  <Text style={{ color: c.primary, fontWeight: '700', fontSize: 12 }}>+ Add Peptide to Blend</Text>
+                </TouchableOpacity>
+              </View>
+
+              {peptides.map((pep, index) => (
+                <View key={index} style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                  <View style={{ flex: 2 }}>
+                    <Text style={{ fontSize: 11, color: c.textSub, marginBottom: 2 }}>Peptide Name</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. Retatrutide or BPC-157"
+                      placeholderTextColor={c.textMuted}
+                      value={pep.name}
+                      onChangeText={(val) => handlePeptideChange(index, 'name', val)}
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, color: c.textSub, marginBottom: 2 }}>Mass (mg)</Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="numeric"
+                      placeholder="10"
+                      placeholderTextColor={c.textMuted}
+                      value={pep.mg ? pep.mg.toString() : ''}
+                      onChangeText={(val) => handlePeptideChange(index, 'mg', val)}
+                    />
+                  </View>
+
+                  {peptides.length > 1 && (
+                    <TouchableOpacity onPress={() => handleRemovePeptideFromBlend(index)} style={{ paddingTop: 16 }}>
+                      <Text style={{ color: c.dangerText, fontWeight: '800', fontSize: 16 }}>✕</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+            </View>
+
             {/* Reconstitution Specs */}
             <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 16 }}>
               <Text style={{ fontWeight: '700', color: c.textMain, fontSize: 15, marginBottom: 12 }}>💧 Reconstitution Specifications</Text>
 
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 12, color: c.textSub, marginBottom: 4 }}>Vial Mass (mg)</Text>
+                  <Text style={{ fontSize: 12, color: c.textSub, marginBottom: 4 }}>Total Vial Mass (mg)</Text>
                   <TextInput
                     style={styles.input}
                     keyboardType="numeric"
