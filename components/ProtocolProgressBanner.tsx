@@ -36,6 +36,13 @@ export default function ProtocolProgressBanner({ vial, targetDate = new Date() }
   // Compute active phase info for targetDate
   const phaseInfo = getProtocolPhaseForDate(vial, targetDate);
 
+  // Compute concentration and syringe pull units for targetDate
+  const primaryPeptide = vial.peptides?.[0] || { mg: vial.vialMg || 10 };
+  const concentrationMgPerMl = (primaryPeptide.mg || 10) / (vial.bacWaterMl || 2);
+  const doseMg = phaseInfo.doseUnit === 'mg' ? phaseInfo.doseAmount : phaseInfo.doseAmount / 1000;
+  const volumeMl = concentrationMgPerMl > 0 ? doseMg / concentrationMgPerMl : 0;
+  const syringeUnits = (volumeMl * 100).toFixed(1);
+
   // Check if targetDate falls in Week 1 of a phase transition (i.e. first 7 days of a new phase)
   let accumulatedWeeks = 0;
   let isTransitionWeek = false;
@@ -57,12 +64,12 @@ export default function ProtocolProgressBanner({ vial, targetDate = new Date() }
 
   return (
     <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.border, padding: 14, marginBottom: 14 }}>
-      {/* Header Row */}
+      {/* Header Row: Protocol Title + Week Tracker */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <Text style={{ fontWeight: '800', color: c.textMain, fontSize: 14 }}>
+        <Text style={{ fontWeight: '800', color: c.textMain, fontSize: 15, flex: 1, paddingRight: 8 }} numberOfLines={1}>
           📋 {vial.vialName || vial.name}
         </Text>
-        <Text style={{ fontSize: 12, fontWeight: '700', color: c.primary }}>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: c.primary }}>
           Week {currentWeek} of {totalWeeks} ({percentComplete}%)
         </Text>
       </View>
@@ -72,13 +79,20 @@ export default function ProtocolProgressBanner({ vial, targetDate = new Date() }
         <View style={{ height: '100%', width: `${percentComplete}%`, backgroundColor: vial.color || c.primary, borderRadius: 4 }} />
       </View>
 
-      {/* Active Phase & Target Dose */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-        <Text style={{ fontSize: 12, color: c.textSub }}>
-          Phase: <Text style={{ fontWeight: '700', color: c.textMain }}>{phaseInfo.phaseName || `Phase ${phaseInfo.phaseIndex + 1}`}</Text>
+      {/* Active Phase Name */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, marginBottom: 8 }}>
+        <Text style={{ fontSize: 12, color: c.textSub, fontWeight: '600' }}>
+          Current Phase: <Text style={{ fontWeight: '700', color: c.textMain }}>{phaseInfo.phaseName || `Phase ${phaseInfo.phaseIndex + 1}`}</Text>
         </Text>
-        <Text style={{ fontSize: 12, color: c.textSub }}>
-          Target Dose: <Text style={{ fontWeight: '700', color: c.primary }}>{phaseInfo.doseAmount}{phaseInfo.doseUnit}</Text>
+      </View>
+
+      {/* PROMINENT HIGH-VISIBILITY TARGET DOSE BADGE */}
+      <View style={{ backgroundColor: c.primaryBg, borderColor: c.primary, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 12, color: c.primary, fontWeight: '700', textTransform: 'uppercase' }}>
+          🎯 Target Dose:
+        </Text>
+        <Text style={{ fontSize: 15, fontWeight: '900', color: c.primary }}>
+          {phaseInfo.doseAmount} {phaseInfo.doseUnit} <Text style={{ fontSize: 12, fontWeight: '700', color: c.textSub }}>({syringeUnits} Units)</Text>
         </Text>
       </View>
 
@@ -89,7 +103,7 @@ export default function ProtocolProgressBanner({ vial, targetDate = new Date() }
             🚀 Phase Escalation Week!
           </Text>
           <Text style={{ color: c.warningTextSub, fontSize: 12, marginTop: 2 }}>
-            Target dose escalated from <Text style={{ fontWeight: '700' }}>{prevDoseText}</Text> ➔ <Text style={{ fontWeight: '700' }}>{phaseInfo.doseAmount}{phaseInfo.doseUnit}</Text>.
+            Target dose escalated from <Text style={{ fontWeight: '700' }}>{prevDoseText}</Text> ➔ <Text style={{ fontWeight: '700' }}>{phaseInfo.doseAmount}{phaseInfo.doseUnit}</Text> ({syringeUnits} Units).
           </Text>
         </View>
       )}
