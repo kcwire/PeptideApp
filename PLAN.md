@@ -174,11 +174,11 @@ export interface ProtocolSupplyResult {
 - [x] **TASK-304**: Multi-Subject Protocol Activation & Dashboard Logging (`context/ProtocolContext.tsx`, `app/(tabs)/index.tsx`)
 - [x] **TASK-305**: Automated Unit Testing & E2E Verification (`scratch/test_multi_subject_protocol.js`)
 
-### Phase 4: Hybrid Smart Protocol Generator (In Progress / Planning)
-- [ ] **TASK-401**: Quick Generator State & Inputs (`components/TitrationPhaseBuilder.tsx`)
-- [ ] **TASK-402**: Equal & Remainder Duration Distribution Engine (`components/TitrationPhaseBuilder.tsx`)
-- [ ] **TASK-403**: Progressive Titration Dose Auto-Generation (`components/TitrationPhaseBuilder.tsx`)
-- [ ] **TASK-404**: Automated Unit Testing & Manual UI Verification (`scratch/test_smart_generator.js`)
+### Phase 4: Hybrid Smart Protocol Generator (Completed)
+- [x] **TASK-401**: Quick Generator State & Inputs (`components/TitrationPhaseBuilder.tsx`)
+- [x] **TASK-402**: Equal & Remainder Duration Distribution Engine (`components/TitrationPhaseBuilder.tsx`)
+- [x] **TASK-403**: Progressive Titration Dose Auto-Generation (`components/TitrationPhaseBuilder.tsx`)
+- [x] **TASK-404**: Automated Unit Testing & Manual UI Verification (`scratch/test_smart_generator.js`)
 
 ---
 

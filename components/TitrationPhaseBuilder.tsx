@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, useColorScheme } from 'react-native';
 import { ProtocolSubject, TitrationPhase } from '../types/protocol';
 import { getStyles, colors } from '../theme';
-import { safeFloat } from '../context/VialContext';
+import { safeFloat, safeInt } from '../context/VialContext';
 import FrequencyPicker from './FrequencyPicker';
 
 interface Props {
@@ -19,6 +19,54 @@ export default function TitrationPhaseBuilder({ phases, subjects = [], onChangeP
   const c = colors[theme];
 
   const isMultiSubject = subjects.length > 1;
+
+  // Hybrid Generator Input State
+  const [genCycleWeeks, setGenCycleWeeks] = useState('24');
+  const [genPhaseCount, setGenPhaseCount] = useState('4');
+  const [genStartDose, setGenStartDose] = useState('2.5');
+  const [genDoseStep, setGenDoseStep] = useState('2.5');
+
+  const handleAutoGenerateSchedule = () => {
+    const totalWeeks = Math.max(1, safeFloat(genCycleWeeks) || 24);
+    const numPhases = Math.max(1, safeInt(genPhaseCount) || 4);
+    const startDose = safeFloat(genStartDose) || 2.5;
+    const doseStep = safeFloat(genDoseStep) || 2.5;
+
+    const baseDuration = Math.max(1, Math.floor(totalWeeks / numPhases));
+    const remainderWeeks = Math.max(0, totalWeeks - (baseDuration * numPhases));
+
+    const generated: TitrationPhase[] = [];
+
+    for (let i = 0; i < numPhases; i++) {
+      const isLastPhase = i === numPhases - 1;
+      const durationWeeks = isLastPhase ? baseDuration + remainderWeeks : baseDuration;
+      const currentDoseAmount = safeFloat((startDose + i * doseStep).toFixed(2));
+      const phaseLabel = i === 0 ? 'Phase 1: Initiation' : isLastPhase ? `Phase ${i + 1}: Maintenance` : `Phase ${i + 1}: Escalation`;
+
+      const initialSubjectDoses = isMultiSubject
+        ? subjects.map(s => ({
+            subjectId: s.id,
+            subjectName: s.name,
+            doseAmount: currentDoseAmount,
+            doseUnit: 'mg' as 'mg' | 'mcg',
+          }))
+        : undefined;
+
+      generated.push({
+        id: `gen_phase_${i + 1}_${Date.now()}_${Math.random().toString(36).substring(2, 4)}`,
+        phaseName: phaseLabel,
+        durationWeeks,
+        doseAmount: currentDoseAmount,
+        doseUnit: 'mg',
+        subjectDoses: initialSubjectDoses,
+        frequency: 'Specific Days',
+        selectedDays: ['Mon'],
+        injectionsPerWeek: 1,
+      });
+    }
+
+    onChangePhases(generated);
+  };
 
   const handleAddPhase = () => {
     const nextIdx = phases.length + 1;
@@ -84,8 +132,78 @@ export default function TitrationPhaseBuilder({ phases, subjects = [], onChangeP
 
   return (
     <View style={{ marginVertical: 12 }}>
+      {/* QUICK SCHEDULE GENERATOR HUB */}
+      <View style={{ backgroundColor: c.card, borderRadius: 12, borderWidth: 1, borderColor: c.primary, padding: 14, marginBottom: 16 }}>
+        <Text style={{ fontSize: 15, fontWeight: '800', color: c.textMain, marginBottom: 4 }}>
+          ⚡ Quick Schedule Generator
+        </Text>
+        <Text style={{ fontSize: 12, color: c.textSub, marginBottom: 10 }}>
+          Specify total cycle weeks and number of phases to auto-generate your schedule.
+        </Text>
+
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, color: c.textSub, marginBottom: 2 }}>Cycle Length (Wks)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              placeholder="24"
+              placeholderTextColor={c.textMuted}
+              value={genCycleWeeks}
+              onChangeText={setGenCycleWeeks}
+            />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, color: c.textSub, marginBottom: 2 }}>Number of Phases</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              placeholder="4"
+              placeholderTextColor={c.textMuted}
+              value={genPhaseCount}
+              onChangeText={setGenPhaseCount}
+            />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, color: c.textSub, marginBottom: 2 }}>Start Dose (mg)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              placeholder="2.5"
+              placeholderTextColor={c.textMuted}
+              value={genStartDose}
+              onChangeText={setGenStartDose}
+            />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, color: c.textSub, marginBottom: 2 }}>Step (+mg)</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              placeholder="2.5"
+              placeholderTextColor={c.textMuted}
+              value={genDoseStep}
+              onChangeText={setGenDoseStep}
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={handleAutoGenerateSchedule}
+          style={{ backgroundColor: c.primary, paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>
+            ⚡ Auto-Generate Schedule ({genCycleWeeks || 24} Weeks)
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* TITRATION PHASE CARDS SECTION */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <Text style={[styles.sectionTitle, { fontSize: 16 }]}>📈 Titration Ramp-Up Phases</Text>
+        <Text style={[styles.sectionTitle, { fontSize: 16 }]}>📈 Titration Ramp-Up Phases ({phases.length})</Text>
         <TouchableOpacity
           onPress={handleAddPhase}
           style={{ backgroundColor: c.primaryBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
