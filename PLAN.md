@@ -167,13 +167,12 @@ export interface ProtocolSupplyResult {
 - [x] **TASK-105**: Multi-Day Persistence & Dynamic Date Titration Engine (`utils/protocolMath.ts`, `app/(tabs)/index.tsx`)
 - [x] **TASK-106**: Full V2 Database Backup & Restore Engine (`app/(tabs)/settings.tsx`, `context/ProtocolContext.tsx`)
 
-### Phase 2: Feature Enhancements & Inventory Redesign (Completed)
-- [x] **TASK-201**: Update Expiration Warning Threshold to 45 Days (`utils/protocolMath.ts`, `components/ProtocolSupplySummary.tsx`)
-- [x] **TASK-202**: Protocol Duplication & Single-Protocol Sharing / Import (`context/ProtocolContext.tsx`, `app/(tabs)/protocol.tsx`)
-- [x] **TASK-203**: Smart Inventory Deduction Prompt on Protocol Activation (`context/ProtocolContext.tsx`)
-- [x] **TASK-204**: Per-Protocol Progress Cards & Escalation Banners (`components/ProtocolProgressBanner.tsx`, `app/(tabs)/index.tsx`)
-- [x] **TASK-205**: Vials Tab Architecture Redesign as Physical Inventory Manager (`app/(tabs)/vials.tsx`)
-- [x] **TASK-206**: End-to-End Verification & Automated Test Suite Execution
+### Phase 3: Multi-Subject Protocol Support (In Progress / Planning)
+- [ ] **TASK-301**: Multi-Subject Protocol Interfaces & Data Types (`types/protocol.ts`)
+- [ ] **TASK-302**: Multi-Subject Supply Calculation Engine (`utils/protocolMath.ts`)
+- [ ] **TASK-303**: Multi-Subject Protocol Planner & Phase Builder UI (`app/(tabs)/protocol.tsx`, `components/TitrationPhaseBuilder.tsx`)
+- [ ] **TASK-304**: Multi-Subject Protocol Activation & Dashboard Logging (`context/ProtocolContext.tsx`, `app/(tabs)/index.tsx`)
+- [ ] **TASK-305**: Automated Unit Testing & E2E Verification (`scratch/test_multi_subject_protocol.js`)
 
 ---
 
@@ -183,8 +182,10 @@ export interface ProtocolSupplyResult {
 - **Shelf-Life Threshold Test**: Verify warning fires at $>45$ days (and does not fire at $\le 45$ days).
 - **Per-Protocol Progress Test**: Verify timeline calculations for concurrent protocols running on different start dates.
 - **Smart Inventory Deduction Test**: Assert existing unopened stock is subtracted from purchase requirement.
+- **Multi-Subject Protocol Test**: Verify multi-subject dose aggregation ($D_{\text{total}} = \sum D_{\text{subject}_i}$) and combined supply math.
 
 ### Manual Verification
 - Test Vials tab inventory hub controls (adding stock, reconstituting bottle from stock).
 - Test per-protocol progress cards and escalation banners on Dashboard.
 - Test protocol duplication and single protocol export/import.
+- Test multi-subject protocol plan creation and independent subject logging on Dashboard.
