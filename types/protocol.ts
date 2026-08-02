@@ -47,6 +47,15 @@ export interface ProtocolConfig {
   isArchived?: boolean;
 }
 
+export interface SubjectPhaseResult {
+  subjectId: string;
+  subjectName: string;
+  doseAmount: number;
+  doseUnit: 'mg' | 'mcg';
+  doseMcg: number;
+  syringeUnitsPull: number;
+}
+
 export interface PhaseCalculationResult {
   phaseId: string;
   phaseName: string;
@@ -55,6 +64,7 @@ export interface PhaseCalculationResult {
   totalMgNeeded: number;
   doseMcg: number;
   syringeUnitsPull: number;  // Tick marks on U-100 syringe
+  subjectResults?: SubjectPhaseResult[]; // Breakdown per subject when multi-subject
 }
 
 export interface ProtocolSupplyResult {

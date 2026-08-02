@@ -1,4 +1,4 @@
-import { ProtocolConfig, ProtocolSupplyResult, PhaseCalculationResult, TitrationPhase } from '../types/protocol';
+import { ProtocolConfig, ProtocolSupplyResult, PhaseCalculationResult, SubjectPhaseResult, TitrationPhase } from '../types/protocol';
 import { safeFloat } from '../context/VialContext';
 
 /**
@@ -73,11 +73,28 @@ export const calculateProtocolSupplies = (config: ProtocolConfig): ProtocolSuppl
     const totalInjectionsPerSubject = Math.round(durationWeeks * injPerWeek);
 
     let phaseMgNeeded = 0;
-    if (config.isMultiSubject && phase.subjectDoses && phase.subjectDoses.length > 0) {
-      phaseMgNeeded = phase.subjectDoses.reduce((sum, sDose) => {
-        const sMcg = sDose.doseUnit === 'mg' ? safeFloat(sDose.doseAmount) * 1000 : safeFloat(sDose.doseAmount);
-        return sum + (totalInjectionsPerSubject * sMcg) / 1000;
-      }, 0);
+    let subjectResults: SubjectPhaseResult[] | undefined = undefined;
+
+    if (config.isMultiSubject && config.subjects && config.subjects.length > 0) {
+      subjectResults = config.subjects.map(s => {
+        const sDoseObj = (phase.subjectDoses || []).find(sd => sd.subjectId === s.id) || {
+          doseAmount: phase.doseAmount,
+          doseUnit: phase.doseUnit,
+        };
+        const sDoseAmount = safeFloat(sDoseObj.doseAmount);
+        const sDoseMcg = sDoseObj.doseUnit === 'mg' ? sDoseAmount * 1000 : sDoseAmount;
+        const sSyringeUnitsPull = calculateSyringeUnits(sDoseMcg, concentrationMgMl);
+        return {
+          subjectId: s.id,
+          subjectName: s.name || 'Subject',
+          doseAmount: sDoseAmount,
+          doseUnit: (sDoseObj.doseUnit || 'mcg') as 'mg' | 'mcg',
+          doseMcg: sDoseMcg,
+          syringeUnitsPull: safeFloat(sSyringeUnitsPull.toFixed(1)),
+        };
+      });
+
+      phaseMgNeeded = subjectResults.reduce((sum, sr) => sum + (totalInjectionsPerSubject * sr.doseMcg) / 1000, 0);
     } else {
       phaseMgNeeded = ((totalInjectionsPerSubject * doseMcg) / 1000) * numSubjects;
     }
@@ -97,6 +114,7 @@ export const calculateProtocolSupplies = (config: ProtocolConfig): ProtocolSuppl
       totalMgNeeded: safeFloat(phaseMgNeeded.toFixed(2)),
       doseMcg,
       syringeUnitsPull: safeFloat(syringeUnitsPull.toFixed(1)),
+      subjectResults,
     };
   });
 

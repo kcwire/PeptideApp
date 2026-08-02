@@ -97,18 +97,41 @@ export default function ProtocolSupplySummary({ supplies }: Props) {
           <Text style={{ flex: 1, fontWeight: '700', color: c.primary, fontSize: 12, textAlign: 'right' }}>Syringe Pull</Text>
         </View>
 
-        {supplies.phases.map(phase => (
-          <View key={phase.phaseId} style={{ flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border }}>
-            <Text style={{ flex: 2, color: c.textMain, fontWeight: '600', fontSize: 13 }}>{phase.phaseName}</Text>
-            <Text style={{ flex: 1, color: c.textMain, fontSize: 13, textAlign: 'center' }}>
-              {phase.doseMcg >= 1000 ? `${phase.doseMcg / 1000}mg` : `${phase.doseMcg}mcg`}
-            </Text>
-            <Text style={{ flex: 1, color: c.textSub, fontSize: 13, textAlign: 'center' }}>{phase.durationWeeks}w</Text>
-            <Text style={{ flex: 1, color: c.primary, fontWeight: '800', fontSize: 13, textAlign: 'right' }}>
-              {phase.syringeUnitsPull} <Text style={{ fontSize: 10 }}>Units</Text>
-            </Text>
-          </View>
-        ))}
+        {supplies.phases.map(phase => {
+          const hasMultiSubjects = Array.isArray(phase.subjectResults) && phase.subjectResults.length > 0;
+          return (
+            <View key={phase.phaseId} style={{ borderBottomWidth: 1, borderBottomColor: c.border, paddingVertical: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ flex: 2, color: c.textMain, fontWeight: '700', fontSize: 13 }}>{phase.phaseName}</Text>
+                {!hasMultiSubjects && (
+                  <Text style={{ flex: 1, color: c.textMain, fontSize: 13, textAlign: 'center' }}>
+                    {phase.doseMcg >= 1000 ? `${phase.doseMcg / 1000}mg` : `${phase.doseMcg}mcg`}
+                  </Text>
+                )}
+                <Text style={{ flex: 1, color: c.textSub, fontSize: 13, textAlign: 'center' }}>{phase.durationWeeks}w</Text>
+                {!hasMultiSubjects && (
+                  <Text style={{ flex: 1, color: c.primary, fontWeight: '800', fontSize: 13, textAlign: 'right' }}>
+                    {phase.syringeUnitsPull} <Text style={{ fontSize: 10 }}>Units</Text>
+                  </Text>
+                )}
+              </View>
+
+              {/* PER-SUBJECT BREAKDOWN ROWS */}
+              {hasMultiSubjects && phase.subjectResults!.map((sRes) => (
+                <View key={sRes.subjectId} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, paddingLeft: 10 }}>
+                  <Text style={{ flex: 2, color: c.textSub, fontSize: 12, fontWeight: '600' }}>👤 {sRes.subjectName}</Text>
+                  <Text style={{ flex: 1, color: c.textMain, fontSize: 12, textAlign: 'center', fontWeight: '700' }}>
+                    {sRes.doseMcg >= 1000 ? `${sRes.doseMcg / 1000}mg` : `${sRes.doseMcg}mcg`}
+                  </Text>
+                  <View style={{ flex: 1 }} />
+                  <Text style={{ flex: 1, color: c.primary, fontWeight: '800', fontSize: 12, textAlign: 'right' }}>
+                    {sRes.syringeUnitsPull} <Text style={{ fontSize: 9 }}>Units</Text>
+                  </Text>
+                </View>
+              ))}
+            </View>
+          );
+        })}
       </View>
     </View>
   );
