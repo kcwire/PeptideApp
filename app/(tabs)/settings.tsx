@@ -1,15 +1,16 @@
 import React, { useContext, useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
-// NEW: Using the modern, synchronous Expo File API
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VialContext } from '../../context/VialContext';
+import { ProtocolContext } from '../../context/ProtocolContext';
 import { colors, getStyles } from '../../theme';
 
 export default function SettingsScreen() {
   const { vials, restoreData } = useContext(VialContext);
+  const { protocols, restoreProtocols } = useContext(ProtocolContext) || {};
   const theme = useColorScheme() ?? 'light';
   const styles = getStyles(theme);
   const c = colors[theme];
@@ -19,10 +20,16 @@ export default function SettingsScreen() {
     try {
       setIsProcessing(true);
       
-      const jsonString = JSON.stringify(vials, null, 2);
+      const backupPayload = {
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        vials: vials || [],
+        protocols: protocols || [],
+      };
+
+      const jsonString = JSON.stringify(backupPayload, null, 2);
       const dateStr = new Date().toISOString().split('T')[0];
       
-      // MODERN EXPORT: Synchronous file creation and writing
       const backupFile = new File(Paths.cache, `PeptideTracker_Backup_${dateStr}.json`);
       if (!backupFile.exists) {
         backupFile.create();
@@ -37,8 +44,8 @@ export default function SettingsScreen() {
       } else {
         Alert.alert("Error", "Sharing is not available on this device.");
       }
-    } catch (error) {
-      Alert.alert("Export Failed", error.message);
+    } catch (error: any) {
+      Alert.alert("Export Failed", error?.message || 'Failed to export backup');
     } finally {
       setIsProcessing(false);
     }
@@ -48,7 +55,6 @@ export default function SettingsScreen() {
     try {
       setIsProcessing(true);
       
-      // 1. ADDED THIS BACK: Google Drive virtual files MUST be copied to the local cache to be read
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/json', 'text/plain'],
         copyToCacheDirectory: true 
@@ -59,34 +65,45 @@ export default function SettingsScreen() {
         return;
       }
 
-      // 2. ADDED AWAIT: This acts as a bulletproof vest. If the system tries to hand us 
-      // an async Promise object, 'await' forces it to unwrap the actual text inside.
       const selectedFile = new File(result.assets[0].uri);
       const fileContents = await selectedFile.text();
 
       const parsedData = JSON.parse(fileContents);
       
-      if (!Array.isArray(parsedData)) {
-        throw new Error("Invalid backup file format. Expected an array of vials.");
+      let vialsToRestore: any[] = [];
+      let protocolsToRestore: any[] = [];
+
+      if (Array.isArray(parsedData)) {
+        // Legacy v1 backup format (array of vials)
+        vialsToRestore = parsedData;
+      } else if (typeof parsedData === 'object' && parsedData !== null) {
+        // Unified v2 backup format
+        vialsToRestore = Array.isArray(parsedData.vials) ? parsedData.vials : [];
+        protocolsToRestore = Array.isArray(parsedData.protocols) ? parsedData.protocols : [];
+      } else {
+        throw new Error("Invalid backup file format.");
       }
 
       Alert.alert(
         "Restore Backup?",
-        "This will completely erase your current app data and replace it with the backup. This cannot be undone.",
+        `This backup contains ${vialsToRestore.length} vial record(s) and ${protocolsToRestore.length} protocol plan(s).\n\nThis will replace your current app data with the backup. Continue?`,
         [
           { text: "Cancel", style: "cancel" },
           { 
             text: "Restore Now", 
             style: "destructive",
             onPress: () => {
-              restoreData(parsedData);
-              Alert.alert("Success", "Your backup has been successfully restored!");
+              restoreData(vialsToRestore);
+              if (restoreProtocols && protocolsToRestore.length > 0) {
+                restoreProtocols(protocolsToRestore);
+              }
+              Alert.alert("Success 🚀", "Your backup has been successfully restored!");
             }
           }
         ]
       );
-    } catch (error) {
-      Alert.alert("Import Failed", "The selected file is not a valid backup. \n\n" + error.message);
+    } catch (error: any) {
+      Alert.alert("Import Failed", "The selected file is not a valid backup. \n\n" + (error?.message || ''));
     } finally {
       setIsProcessing(false);
     }
@@ -101,7 +118,7 @@ export default function SettingsScreen() {
         <View style={[styles.card, { marginTop: 10 }]}>
           <Text style={styles.sectionTitle}>Backup</Text>
           <Text style={[styles.label, { marginTop: 0, fontWeight: 'normal', color: c.textSub }]}>
-            Export your entire database, including all active protocols, inactive vials, and injection history, to a secure JSON file.
+            Export your entire database, including all active/inactive vials, injection history, and titration protocol plans, to a secure JSON file.
           </Text>
           
           <TouchableOpacity 

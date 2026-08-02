@@ -93,6 +93,18 @@ export const ProtocolProvider = ({ children }: { children: React.ReactNode }) =>
     persistProtocols(updated);
   };
 
+  const restoreProtocols = (importedProtocols: ProtocolConfig[]) => {
+    if (!Array.isArray(importedProtocols)) return;
+    const sanitized = importedProtocols.map(p => ({
+      ...p,
+      id: p.id || Date.now().toString() + Math.random().toString(36).substring(2, 6),
+      name: p.name || 'Restored Protocol',
+      phases: Array.isArray(p.phases) ? p.phases : [],
+    }));
+    setProtocols(sanitized);
+    persistProtocols(sanitized);
+  };
+
   /**
    * Converts a Protocol Plan into an active tracked Vial on the Dashboard & Protocols screen.
    */
@@ -142,6 +154,7 @@ export const ProtocolProvider = ({ children }: { children: React.ReactNode }) =>
         deleteProtocol,
         toggleArchiveProtocol,
         convertProtocolToVials,
+        restoreProtocols,
         loadProtocols,
       }}
     >
